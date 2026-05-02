@@ -1,59 +1,80 @@
 import { useEffect, useMemo, useState } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
+import WeekCard from '../components/WeekCard.jsx';
+import SpecialServiceCard from '../components/SpecialServiceCard.jsx';
+import AddSpecialServiceModal from '../components/AddSpecialServiceModal.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
-import {
-  canDecide,
-  canVote,
-  ROLE_LABELS,
-} from '../lib/permissions';
-import {
-  upcomingSundays,
-  loadPlanningState,
-  loadPlanningStateOnly,
-  deriveStatus,
-  seedRclOptions,
-  upsertWorshipPlan,
-  toggleVote,
-  addManualOption,
-  READING_LABELS,
-} from '../lib/planning';
+import { canDecide, canVote, ROLE_LABELS } from '../lib/permissions';
+import { upcomingSundays, loadPlanningState } from '../lib/planning';
+import { loadSpecialServicesFrom } from '../lib/specialServices';
+import { loadGroupingState } from '../lib/groupings';
+import { loadWeekElementsInRange } from '../lib/elements';
 
-// Phase 1: 12-week forecast.
+// Forecast — Phase 2.
 //
-// Each upcoming Sunday is a card showing its RCL readings + workflow
-// status. Pastor (and office_admin) see action buttons:
-//   - Pick text  — selects a text right now (no vote)
-//   - Open vote  — seeds the RCL options into planning_options so team
-//                  members can thumbs-up
-//   - Off-lectionary — write in any reference and select it
-//
-// Voting-eligible team members see thumbs-up buttons on each option
-// once a vote is open, with a live tally.
+// Interleaves the next 12 Sundays (from rcl.json) with any special
+// services the pastor has added on dates in the same window. Sundays
+// use the WeekCard component (RCL readings + voting + grouping/theme
+// badge + linked elements teaser). Special services use
+// SpecialServiceCard.
 export default function Forecast() {
   const { user, profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [busyDate, setBusyDate] = useState(null);
-  const [state, setState] = useState({
+  const [planningState, setPlanningState] = useState({
     plansByDate: {},
     optionsByDate: {},
     votesByOption: {},
     myVotedOptions: new Set(),
   });
+  const [specialServices, setSpecialServices] = useState([]);
+  const [groupingState, setGroupingState] = useState({
+    groupings: [],
+    datesByGrouping: {},
+    groupingsByDate: {},
+    themesByGrouping: {},
+    votesByTheme: {},
+    myVotedThemes: new Set(),
+  });
+  const [weekElementsByDate, setWeekElementsByDate] = useState({});
+  const [showAddSpecial, setShowAddSpecial] = useState(false);
+  const [editingSpecial, setEditingSpecial] = useState(null);
 
   const today = new Date().toISOString().slice(0, 10);
-  const weeks = useMemo(() => upcomingSundays(today, 12), [today]);
+  const sundays = useMemo(() => upcomingSundays(today, 12), [today]);
+
+  // Date window we care about: today → last Sunday in the forecast.
+  // Used for special_services + week_elements range queries.
+  const horizonEnd = sundays.length > 0
+    ? sundays[sundays.length - 1].service_date
+    : today;
 
   const reload = async () => {
-    if (!user?.id || weeks.length === 0) return;
+    if (!user?.id || sundays.length === 0) return;
     setLoading(true);
     setError(null);
     try {
-      const next = await loadPlanningState(
-        weeks.map((w) => w.service_date),
-        user.id
+      const [planning, specials, grouping, weekElements] = await Promise.all([
+        loadPlanningState(sundays.map((w) => w.service_date), user.id),
+        loadSpecialServicesFrom(today),
+        loadGroupingState(user.id),
+        loadWeekElementsInRange(today, horizonEnd),
+      ]);
+      setPlanningState(planning);
+      // Only show specials in the visible window. Anything past the
+      // 12-Sunday horizon stays in the database for later forecasts.
+      setSpecialServices(
+        (specials || []).filter((s) => s.service_date <= horizonEnd)
       );
-      setState(next);
+      setGroupingState(grouping);
+
+      const elementsByDate = {};
+      for (const we of weekElements || []) {
+        if (!elementsByDate[we.service_date]) elementsByDate[we.service_date] = [];
+        elementsByDate[we.service_date].push(we);
+      }
+      setWeekElementsByDate(elementsByDate);
     } catch (e) {
       setError(e.message || String(e));
     } finally {
@@ -66,6 +87,25 @@ export default function Forecast() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
+  // Build a unified, date-sorted list of cards: Sundays + special services
+  // Tie-break: Sundays first if a special falls on the same date.
+  const items = useMemo(() => {
+    const list = [];
+    for (const w of sundays) {
+      list.push({ kind: 'sunday', date: w.service_date, week: w });
+    }
+    for (const s of specialServices) {
+      list.push({ kind: 'special', date: s.service_date, service: s });
+    }
+    list.sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      // Same date: Sunday first
+      if (a.kind === b.kind) return 0;
+      return a.kind === 'sunday' ? -1 : 1;
+    });
+    return list;
+  }, [sundays, specialServices]);
+
   if (!profile) return <LoadingSpinner label="Loading…" />;
   if (loading) return <LoadingSpinner label="Loading the next 12 weeks…" />;
 
@@ -74,17 +114,31 @@ export default function Forecast() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="font-serif text-2xl text-umc-900">
-          Worship planning · next 12 weeks
-        </h1>
-        <p className="text-sm text-gray-500 mt-0.5">
-          {decide
-            ? "Pick a text directly, open it for vote, or write in an off-lectionary text."
-            : vote
-              ? 'Cast thumbs-up votes on any week the pastor has opened for voting.'
-              : 'Read-only view of the upcoming worship schedule.'}
-        </p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="font-serif text-2xl text-umc-900">
+            Worship planning · next 12 weeks
+          </h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {decide
+              ? "Pick a text directly, open it for vote, or write in an off-lectionary text."
+              : vote
+                ? 'Cast thumbs-up votes on any week the pastor has opened for voting.'
+                : 'Read-only view of the upcoming worship schedule.'}
+          </p>
+        </div>
+        {decide && (
+          <button
+            type="button"
+            onClick={() => {
+              setEditingSpecial(null);
+              setShowAddSpecial(true);
+            }}
+            className="btn-secondary text-sm shrink-0"
+          >
+            + Add special service
+          </button>
+        )}
       </div>
 
       {error && (
@@ -93,26 +147,42 @@ export default function Forecast() {
         </div>
       )}
 
-      {weeks.length === 0 ? (
+      {items.length === 0 ? (
         <p className="card text-center text-sm text-gray-500 py-10">
           No upcoming RCL data found. Add weeks to{' '}
           <code className="text-xs">src/data/rcl.json</code>.
         </p>
       ) : (
         <ul className="space-y-3">
-          {weeks.map((w) => (
-            <WeekCard
-              key={w.service_date}
-              week={w}
-              state={state}
-              userId={user.id}
-              role={profile.role}
-              busyDate={busyDate}
-              setBusyDate={setBusyDate}
-              setError={setError}
-              reload={reload}
-            />
-          ))}
+          {items.map((item) =>
+            item.kind === 'sunday' ? (
+              <WeekCard
+                key={`sun-${item.week.service_date}`}
+                week={item.week}
+                state={planningState}
+                groupingState={groupingState}
+                weekElementsByDate={weekElementsByDate}
+                userId={user.id}
+                role={profile.role}
+                busyDate={busyDate}
+                setBusyDate={setBusyDate}
+                setError={setError}
+                reload={reload}
+              />
+            ) : (
+              <SpecialServiceCard
+                key={`spc-${item.service.id}`}
+                service={item.service}
+                role={profile.role}
+                onEdit={(svc) => {
+                  setEditingSpecial(svc);
+                  setShowAddSpecial(true);
+                }}
+                onChanged={reload}
+                setError={setError}
+              />
+            )
+          )}
         </ul>
       )}
 
@@ -122,376 +192,17 @@ export default function Forecast() {
           (<span>{ROLE_LABELS[profile.role] || profile.role}</span>) — read-only.
         </p>
       )}
+
+      <AddSpecialServiceModal
+        open={showAddSpecial}
+        onClose={() => {
+          setShowAddSpecial(false);
+          setEditingSpecial(null);
+        }}
+        userId={user.id}
+        initial={editingSpecial}
+        onSaved={reload}
+      />
     </div>
-  );
-}
-
-function fmtServiceDate(iso) {
-  return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
-
-const STATUS_BADGE = {
-  undecided: { label: 'No plan yet', cls: 'bg-gray-200 text-gray-700' },
-  options: { label: 'Options seeded', cls: 'bg-blue-100 text-blue-800' },
-  voting: { label: 'Voting open', cls: 'bg-amber-100 text-amber-800' },
-  selected: { label: 'Selected', cls: 'bg-green-100 text-green-800' },
-};
-
-function WeekCard({
-  week,
-  state,
-  userId,
-  role,
-  busyDate,
-  setBusyDate,
-  setError,
-  reload,
-}) {
-  const decide = canDecide(role);
-  const voteEligible = canVote(role);
-  const plan = state.plansByDate[week.service_date];
-  const options = state.optionsByDate[week.service_date] ?? [];
-  const status = deriveStatus(week.service_date, state);
-  const badge = STATUS_BADGE[status];
-  const busy = busyDate === week.service_date;
-
-  // Find the selected option, if any.
-  const selectedOption = plan?.selected_text_option_id
-    ? options.find((o) => o.id === plan.selected_text_option_id)
-    : null;
-
-  // ----- Pastor / office_admin actions -----
-
-  const pickText = async (option) => {
-    setBusyDate(week.service_date);
-    setError(null);
-    try {
-      await upsertWorshipPlan(week.service_date, {
-        scripture_reference: option.reference,
-        selected_text_option_id: option.id,
-        text_source: 'rcl',
-        lectionary_year: week.lectionary_year,
-        lectionary_designation: week.designation,
-        liturgical_season: week.liturgical_season,
-      });
-      await reload();
-    } catch (e) {
-      setError(e.message || String(e));
-    } finally {
-      setBusyDate(null);
-    }
-  };
-
-  // "Pick this" on the inline RCL readings (when no options exist yet):
-  // seed the four RCL options first so we have an option_id to point
-  // selected_text_option_id at, then immediately select the chosen one.
-  // This keeps the data model consistent (every selected text has a
-  // matching planning_options row).
-  const pickRclDirect = async (kind, reference) => {
-    setBusyDate(week.service_date);
-    setError(null);
-    try {
-      await seedRclOptions(week.service_date);
-      // Re-fetch to find the option we want to point at.
-      const fresh = await loadPlanningStateOnly([week.service_date], userId);
-      const matched = (fresh.optionsByDate[week.service_date] ?? []).find(
-        (o) =>
-          o.reading_kind === kind &&
-          o.reference.toLowerCase() === reference.toLowerCase()
-      );
-      if (!matched) {
-        throw new Error(
-          `Couldn't find the seeded option for ${kind} ${reference}.`
-        );
-      }
-      await upsertWorshipPlan(week.service_date, {
-        scripture_reference: reference,
-        selected_text_option_id: matched.id,
-        text_source: 'rcl',
-        lectionary_year: week.lectionary_year,
-        lectionary_designation: week.designation,
-        liturgical_season: week.liturgical_season,
-      });
-      await reload();
-    } catch (e) {
-      setError(e.message || String(e));
-    } finally {
-      setBusyDate(null);
-    }
-  };
-
-  const openVote = async () => {
-    setBusyDate(week.service_date);
-    setError(null);
-    try {
-      await seedRclOptions(week.service_date);
-      // Also create the worship_plans row so we can track lectionary_year etc.
-      await upsertWorshipPlan(week.service_date, {
-        lectionary_year: week.lectionary_year,
-        lectionary_designation: week.designation,
-        liturgical_season: week.liturgical_season,
-      });
-      await reload();
-    } catch (e) {
-      setError(e.message || String(e));
-    } finally {
-      setBusyDate(null);
-    }
-  };
-
-  const addOffLectionary = async () => {
-    const reference = window.prompt(
-      `Off-lectionary text for ${week.designation}:\n` +
-        `e.g., "Mark 12:28-34" or "Genesis 22:1-14"`
-    );
-    if (!reference?.trim()) return;
-    setBusyDate(week.service_date);
-    setError(null);
-    try {
-      const created = await addManualOption(week.service_date, reference);
-      await upsertWorshipPlan(week.service_date, {
-        scripture_reference: reference.trim(),
-        selected_text_option_id: created.id,
-        text_source: 'off_lectionary',
-        lectionary_year: week.lectionary_year,
-        lectionary_designation: week.designation,
-        liturgical_season: week.liturgical_season,
-      });
-      await reload();
-    } catch (e) {
-      setError(e.message || String(e));
-    } finally {
-      setBusyDate(null);
-    }
-  };
-
-  const reopen = async () => {
-    if (
-      !window.confirm(
-        `Re-open ${week.designation}? Clears the selection so the team can vote again.`
-      )
-    ) {
-      return;
-    }
-    setBusyDate(week.service_date);
-    setError(null);
-    try {
-      await upsertWorshipPlan(week.service_date, {
-        scripture_reference: null,
-        selected_text_option_id: null,
-        text_source: null,
-      });
-      await reload();
-    } catch (e) {
-      setError(e.message || String(e));
-    } finally {
-      setBusyDate(null);
-    }
-  };
-
-  // ----- Voter actions -----
-
-  const handleVoteToggle = async (option) => {
-    setBusyDate(week.service_date);
-    setError(null);
-    try {
-      await toggleVote(
-        option.id,
-        userId,
-        state.myVotedOptions.has(option.id)
-      );
-      await reload();
-    } catch (e) {
-      setError(e.message || String(e));
-    } finally {
-      setBusyDate(null);
-    }
-  };
-
-  return (
-    <li className="card">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <h2 className="font-serif text-lg text-umc-900">
-              {week.designation}
-            </h2>
-            <span
-              className={`px-2 py-0.5 text-[10px] uppercase tracking-wide rounded ${badge.cls}`}
-            >
-              {badge.label}
-            </span>
-          </div>
-          <p className="text-xs text-gray-500 mt-0.5">
-            {fmtServiceDate(week.service_date)} · Year{' '}
-            {week.lectionary_year}
-            {week.liturgical_season &&
-              ` · ${week.liturgical_season} season`}
-          </p>
-        </div>
-        {decide && status !== 'selected' && (
-          <div className="flex gap-2 flex-wrap shrink-0">
-            {options.length === 0 && (
-              <button
-                type="button"
-                onClick={openVote}
-                disabled={busy}
-                className="btn-secondary text-sm disabled:opacity-50"
-                title="Seed the four RCL readings as voting options"
-              >
-                {busy ? 'Working…' : 'Open vote'}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={addOffLectionary}
-              disabled={busy}
-              className="btn-secondary text-sm disabled:opacity-50"
-            >
-              Off-lectionary
-            </button>
-          </div>
-        )}
-        {decide && status === 'selected' && (
-          <button
-            type="button"
-            onClick={reopen}
-            disabled={busy}
-            className="btn-secondary text-sm disabled:opacity-50 shrink-0"
-          >
-            Re-open
-          </button>
-        )}
-      </div>
-
-      {/* Selected text — pinned at top when chosen */}
-      {status === 'selected' && (
-        <div className="mt-3 p-3 rounded bg-green-50 border border-green-200">
-          <p className="text-xs uppercase tracking-wide text-green-800 mb-1">
-            Selected text
-          </p>
-          <p className="font-serif text-base text-umc-900">
-            {plan?.scripture_reference}
-            {selectedOption?.reading_kind &&
-              selectedOption.reading_kind !== 'other' && (
-                <span className="ml-2 text-xs text-gray-500">
-                  ({READING_LABELS[selectedOption.reading_kind]})
-                </span>
-              )}
-            {plan?.text_source === 'off_lectionary' && (
-              <span className="ml-2 text-[10px] uppercase tracking-wide text-amber-700">
-                off-lectionary
-              </span>
-            )}
-          </p>
-        </div>
-      )}
-
-      {/* RCL readings — always show as a reference */}
-      <div className="mt-3 space-y-1.5">
-        <p className="text-[10px] uppercase tracking-wide text-gray-500">
-          {options.length > 0 ? 'Voting options' : 'RCL readings'}
-        </p>
-        {options.length === 0 ? (
-          // No voting started yet — show RCL readings inline (and let
-          // pastor "Pick text" directly on each).
-          <ul className="space-y-1">
-            {Object.entries(week.readings || {}).map(([kind, ref]) => (
-              <li
-                key={kind}
-                className="flex items-center justify-between gap-2 py-1"
-              >
-                <div className="flex items-baseline gap-2 min-w-0">
-                  <span className="text-[10px] uppercase tracking-wide text-gray-500 w-12 shrink-0">
-                    {READING_LABELS[kind] || kind}
-                  </span>
-                  <span className="text-sm text-umc-900 truncate">
-                    {ref}
-                  </span>
-                </div>
-                {decide && status !== 'selected' && (
-                  <button
-                    type="button"
-                    onClick={() => pickRclDirect(kind, ref)}
-                    disabled={busy}
-                    className="text-xs text-umc-700 hover:text-umc-900 underline disabled:opacity-50 whitespace-nowrap"
-                  >
-                    Pick this
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          // Options exist — show with vote buttons + tally.
-          <ul className="space-y-1.5">
-            {options.map((o) => {
-              const votes = state.votesByOption[o.id] ?? [];
-              const myVote = state.myVotedOptions.has(o.id);
-              const isSelected = plan?.selected_text_option_id === o.id;
-              return (
-                <li
-                  key={o.id}
-                  className={`flex items-center justify-between gap-2 py-1.5 px-2 rounded ${
-                    isSelected ? 'bg-green-50' : ''
-                  }`}
-                >
-                  <div className="flex items-baseline gap-2 min-w-0">
-                    <span className="text-[10px] uppercase tracking-wide text-gray-500 w-12 shrink-0">
-                      {READING_LABELS[o.reading_kind] || o.reading_kind}
-                    </span>
-                    <span className="text-sm text-umc-900 truncate">
-                      {o.reference}
-                    </span>
-                    {o.source === 'manual' && (
-                      <span className="text-[10px] uppercase tracking-wide text-amber-700">
-                        manual
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {voteEligible && status !== 'selected' && (
-                      <button
-                        type="button"
-                        onClick={() => handleVoteToggle(o)}
-                        disabled={busy}
-                        className={`text-xs px-2 py-1 rounded border disabled:opacity-50 transition-colors ${
-                          myVote
-                            ? 'bg-umc-700 text-white border-umc-700'
-                            : 'bg-white text-gray-700 border-gray-300 hover:border-umc-700'
-                        }`}
-                        title={myVote ? 'Remove your vote' : 'Add your vote'}
-                      >
-                        👍 {votes.length}
-                      </button>
-                    )}
-                    {!voteEligible && (
-                      <span className="text-xs text-gray-500">
-                        👍 {votes.length}
-                      </span>
-                    )}
-                    {decide && status !== 'selected' && (
-                      <button
-                        type="button"
-                        onClick={() => pickText(o)}
-                        disabled={busy}
-                        className="text-xs text-umc-700 hover:text-umc-900 underline disabled:opacity-50 whitespace-nowrap"
-                      >
-                        Pick
-                      </button>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-    </li>
   );
 }

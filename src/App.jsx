@@ -3,6 +3,9 @@ import Layout from './components/Layout.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import Login from './pages/Login.jsx';
 import Forecast from './pages/Forecast.jsx';
+import Themes from './pages/Themes.jsx';
+import Library from './pages/Library.jsx';
+import Suggestions from './pages/Suggestions.jsx';
 
 export default function App() {
   return (
@@ -16,6 +19,9 @@ export default function App() {
         }
       >
         <Route path="/" element={<Forecast />} />
+        <Route path="/themes" element={<Themes />} />
+        <Route path="/library" element={<Library />} />
+        <Route path="/suggestions" element={<Suggestions />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

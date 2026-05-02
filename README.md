@@ -15,13 +15,32 @@ Bulletin, Sermons, and Social apps; shares the same Supabase backend.
   - Once a text is selected, it's pinned at the top of the card; pastor
     can re-open if plans change.
 
-## Phase 2-4 (planned)
+## Phase 2 — what's here
 
-- Seasonal themes + custom week grouping (suggest / vote / select)
-- Pastor-only intelligence panel (matching sermons + library resources)
-- Auto-flow: selected text + theme populate upcoming bulletins, surface
+- **Special services** (Ash Wed, Christmas Eve, funerals, weddings, etc.)
+  inline with Sundays in the forecast. Two flavors:
+  - *Planning* services share the Sunday workflow (voting, themes, etc.)
+  - *Lightweight* services are calendar-only records (funerals, weddings)
+- **Themes** at `/themes`:
+  - Season groupings (one per liturgical season) with suggest/vote/select
+  - Custom groupings — pastor names a sermon arc / series and adds dates
+  - Same thumbs-up voting model as scripture options
+- **Library** at `/library`:
+  - Reusable liturgy text (call to worship, prayers, responsive readings)
+  - Reusable hymn picks (hymnal + number + notes)
+  - Tagged by season, free-form tags, and scripture refs
+  - One-click attach to any upcoming service date
+- **Suggestions** at `/suggestions`:
+  - Phase-4 preview queue. Anyone on the team can suggest a hymn or
+    liturgy element; pastor reviews and accepts / declines.
+
+## Phase 3-4 (planned)
+
+- Pastor-only intelligence panel (matching sermons + library resources
+  for the selected text)
+- Auto-flow: selected text + theme populate upcoming bulletins; surface
   on the Social app dashboard
-- Worship-element suggestions queue routing into the bulletin admin
+- Tighter integration of Suggestions queue with the bulletin admin
 
 ## Setup (one time)
 
@@ -48,6 +67,13 @@ npm run dev
 migration `0029_worship_planning.sql` in the bulletin app's
 `supabase/migrations/`. The existing `staff_profiles.role` enum picks
 up the new `worship_team` role from the same migration.
+
+Phase 2 adds migration `0030_worship_planning_phase2.sql` (in the same
+bulletin app `supabase/migrations/` directory) for `special_services`,
+`worship_groupings`, `worship_grouping_dates`, `theme_options`,
+`theme_votes`, `worship_elements`, `week_elements`, and
+`element_suggestions`. Run that migration before deploying the Phase 2
+build.
 
 ## Updating RCL data
 
