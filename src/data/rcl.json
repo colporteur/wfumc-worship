@@ -1,0 +1,210 @@
+{
+  "_notes": [
+    "Revised Common Lectionary readings, semi-continuous (Track 1) where applicable.",
+    "Pastor Todd's note to himself: this file was hand-curated from Claude's training data — verify each Sunday against a trusted source (e.g., Vanderbilt Divinity Library) before using for actual preaching.",
+    "When you find an error, edit the entry directly. The Worship Planning app will pick it up on the next deploy.",
+    "Format: each entry is one Sunday or special service. 'kind' is 'sunday' or 'special'. Readings are the standard RCL ones; some Sundays have alternates.",
+    "Coverage: starts May 3, 2026 (Easter 5C). Extend forward as needed."
+  ],
+  "weeks": [
+    {
+      "service_date": "2026-05-03",
+      "lectionary_year": "C",
+      "liturgical_season": "easter",
+      "designation": "Easter 5",
+      "kind": "sunday",
+      "readings": {
+        "ot": "Acts 11:1-18",
+        "psalm": "Psalm 148",
+        "epistle": "Revelation 21:1-6",
+        "gospel": "John 13:31-35"
+      },
+      "notes": "Easter season replaces the OT slot with a reading from Acts."
+    },
+    {
+      "service_date": "2026-05-10",
+      "lectionary_year": "C",
+      "liturgical_season": "easter",
+      "designation": "Easter 6",
+      "kind": "sunday",
+      "readings": {
+        "ot": "Acts 16:9-15",
+        "psalm": "Psalm 67",
+        "epistle": "Revelation 21:10, 22-22:5",
+        "gospel": "John 14:23-29"
+      },
+      "alternate_gospel": "John 5:1-9"
+    },
+    {
+      "service_date": "2026-05-17",
+      "lectionary_year": "C",
+      "liturgical_season": "easter",
+      "designation": "Easter 7",
+      "kind": "sunday",
+      "readings": {
+        "ot": "Acts 16:16-34",
+        "psalm": "Psalm 97",
+        "epistle": "Revelation 22:12-14, 16-17, 20-21",
+        "gospel": "John 17:20-26"
+      },
+      "notes": "Many congregations observe Ascension Sunday on this day (Acts 1:1-11 / Ps 47 or 93 / Eph 1:15-23 / Luke 24:44-53)."
+    },
+    {
+      "service_date": "2026-05-24",
+      "lectionary_year": "C",
+      "liturgical_season": "pentecost",
+      "designation": "Day of Pentecost",
+      "kind": "sunday",
+      "readings": {
+        "ot": "Acts 2:1-21",
+        "psalm": "Psalm 104:24-34, 35b",
+        "epistle": "Romans 8:14-17",
+        "gospel": "John 14:8-17, (25-27)"
+      },
+      "alternate_ot": "Genesis 11:1-9"
+    },
+    {
+      "service_date": "2026-05-31",
+      "lectionary_year": "C",
+      "liturgical_season": "ordinary",
+      "designation": "Trinity Sunday",
+      "kind": "sunday",
+      "readings": {
+        "ot": "Proverbs 8:1-4, 22-31",
+        "psalm": "Psalm 8",
+        "epistle": "Romans 5:1-5",
+        "gospel": "John 16:12-15"
+      }
+    },
+    {
+      "service_date": "2026-06-07",
+      "lectionary_year": "C",
+      "liturgical_season": "ordinary",
+      "designation": "Proper 5",
+      "kind": "sunday",
+      "readings": {
+        "ot": "1 Kings 17:8-16, (17-24)",
+        "psalm": "Psalm 146",
+        "epistle": "Galatians 1:11-24",
+        "gospel": "Luke 7:11-17"
+      }
+    },
+    {
+      "service_date": "2026-06-14",
+      "lectionary_year": "C",
+      "liturgical_season": "ordinary",
+      "designation": "Proper 6",
+      "kind": "sunday",
+      "readings": {
+        "ot": "1 Kings 21:1-10, (11-14), 15-21a",
+        "psalm": "Psalm 5:1-8",
+        "epistle": "Galatians 2:15-21",
+        "gospel": "Luke 7:36-8:3"
+      }
+    },
+    {
+      "service_date": "2026-06-21",
+      "lectionary_year": "C",
+      "liturgical_season": "ordinary",
+      "designation": "Proper 7",
+      "kind": "sunday",
+      "readings": {
+        "ot": "1 Kings 19:1-4, (5-7), 8-15a",
+        "psalm": "Psalms 42 and 43",
+        "epistle": "Galatians 3:23-29",
+        "gospel": "Luke 8:26-39"
+      }
+    },
+    {
+      "service_date": "2026-06-28",
+      "lectionary_year": "C",
+      "liturgical_season": "ordinary",
+      "designation": "Proper 8",
+      "kind": "sunday",
+      "readings": {
+        "ot": "2 Kings 2:1-2, 6-14",
+        "psalm": "Psalm 77:1-2, 11-20",
+        "epistle": "Galatians 5:1, 13-25",
+        "gospel": "Luke 9:51-62"
+      }
+    },
+    {
+      "service_date": "2026-07-05",
+      "lectionary_year": "C",
+      "liturgical_season": "ordinary",
+      "designation": "Proper 9",
+      "kind": "sunday",
+      "readings": {
+        "ot": "2 Kings 5:1-14",
+        "psalm": "Psalm 30",
+        "epistle": "Galatians 6:(1-6), 7-16",
+        "gospel": "Luke 10:1-11, 16-20"
+      }
+    },
+    {
+      "service_date": "2026-07-12",
+      "lectionary_year": "C",
+      "liturgical_season": "ordinary",
+      "designation": "Proper 10",
+      "kind": "sunday",
+      "readings": {
+        "ot": "Amos 7:7-17",
+        "psalm": "Psalm 82",
+        "epistle": "Colossians 1:1-14",
+        "gospel": "Luke 10:25-37"
+      }
+    },
+    {
+      "service_date": "2026-07-19",
+      "lectionary_year": "C",
+      "liturgical_season": "ordinary",
+      "designation": "Proper 11",
+      "kind": "sunday",
+      "readings": {
+        "ot": "Amos 8:1-12",
+        "psalm": "Psalm 52",
+        "epistle": "Colossians 1:15-28",
+        "gospel": "Luke 10:38-42"
+      }
+    },
+    {
+      "service_date": "2026-07-26",
+      "lectionary_year": "C",
+      "liturgical_season": "ordinary",
+      "designation": "Proper 12",
+      "kind": "sunday",
+      "readings": {
+        "ot": "Hosea 1:2-10",
+        "psalm": "Psalm 85",
+        "epistle": "Colossians 2:6-15, (16-19)",
+        "gospel": "Luke 11:1-13"
+      }
+    },
+    {
+      "service_date": "2026-08-02",
+      "lectionary_year": "C",
+      "liturgical_season": "ordinary",
+      "designation": "Proper 13",
+      "kind": "sunday",
+      "readings": {
+        "ot": "Hosea 11:1-11",
+        "psalm": "Psalm 107:1-9, 43",
+        "epistle": "Colossians 3:1-11",
+        "gospel": "Luke 12:13-21"
+      }
+    },
+    {
+      "service_date": "2026-08-09",
+      "lectionary_year": "C",
+      "liturgical_season": "ordinary",
+      "designation": "Proper 14",
+      "kind": "sunday",
+      "readings": {
+        "ot": "Isaiah 1:1, 10-20",
+        "psalm": "Psalm 50:1-8, 22-23",
+        "epistle": "Hebrews 11:1-3, 8-16",
+        "gospel": "Luke 12:32-40"
+      }
+    }
+  ]
+}
