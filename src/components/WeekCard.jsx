@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { canDecide, canVote } from '../lib/permissions';
+import { canDecide, canVote, canSeePastorOnlyPanels } from '../lib/permissions';
 import {
   loadPlanningStateOnly,
   seedRclOptions,
@@ -9,6 +9,7 @@ import {
   READING_LABELS,
   deriveStatus,
 } from '../lib/planning';
+import IntelligencePanel from './IntelligencePanel.jsx';
 
 // Renders one Sunday (or RCL-listed special service) in the forecast.
 // Extracted from Forecast.jsx so the page itself stays focused on
@@ -437,6 +438,23 @@ export default function WeekCard({
             )}
           </ul>
         </div>
+      )}
+
+      {/* Phase 3: pastor-only intelligence panel */}
+      {canSeePastorOnlyPanels(role) && (
+        <IntelligencePanel
+          scriptureReference={
+            // If text is selected, look up matches for it.
+            // Otherwise, fold all four RCL options into a multi-ref
+            // string so pastor sees matches across the whole candidate
+            // set (parser handles ; as separator).
+            plan?.scripture_reference ||
+            (week.readings
+              ? Object.values(week.readings).filter(Boolean).join('; ')
+              : null)
+          }
+          themes={selectedThemes.map((s) => s.theme)}
+        />
       )}
     </li>
   );
