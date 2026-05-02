@@ -1,209 +1,577 @@
 {
   "_notes": [
-    "Revised Common Lectionary readings, semi-continuous (Track 1) where applicable.",
-    "Pastor Todd's note to himself: this file was hand-curated from Claude's training data — verify each Sunday against a trusted source (e.g., Vanderbilt Divinity Library) before using for actual preaching.",
-    "When you find an error, edit the entry directly. The Worship Planning app will pick it up on the next deploy.",
-    "Format: each entry is one Sunday or special service. 'kind' is 'sunday' or 'special'. Readings are the standard RCL ones; some Sundays have alternates.",
-    "Coverage: starts May 3, 2026 (Easter 5C). Extend forward as needed."
+    "Revised Common Lectionary readings — sourced from Pastor Todd's official UMC planning calendar (May 2026 onward).",
+    "Lectionary years: Year A through Christ the King 2026 (Nov 22). Year B begins Advent 1 (Nov 29, 2026).",
+    "November and December 2026 entries are filled from Claude's training data (no photo source); verify before relying.",
+    "Designations follow UMC style ('2nd Sunday after Pentecost' rather than RCL's 'Proper 5').",
+    "Psalm references include the UMH (United Methodist Hymnal) psalter number where the calendar shows one.",
+    "When you find an error, edit the entry directly. The Worship Planning app picks it up on the next deploy."
   ],
   "weeks": [
     {
       "service_date": "2026-05-03",
-      "lectionary_year": "C",
+      "lectionary_year": "A",
       "liturgical_season": "easter",
-      "designation": "Easter 5",
+      "designation": "5th Sunday of Easter",
       "kind": "sunday",
+      "color": "white",
       "readings": {
-        "ot": "Acts 11:1-18",
-        "psalm": "Psalm 148",
-        "epistle": "Revelation 21:1-6",
-        "gospel": "John 13:31-35"
-      },
-      "notes": "Easter season replaces the OT slot with a reading from Acts."
-    },
-    {
-      "service_date": "2026-05-10",
-      "lectionary_year": "C",
-      "liturgical_season": "easter",
-      "designation": "Easter 6",
-      "kind": "sunday",
-      "readings": {
-        "ot": "Acts 16:9-15",
-        "psalm": "Psalm 67",
-        "epistle": "Revelation 21:10, 22-22:5",
-        "gospel": "John 14:23-29"
-      },
-      "alternate_gospel": "John 5:1-9"
-    },
-    {
-      "service_date": "2026-05-17",
-      "lectionary_year": "C",
-      "liturgical_season": "easter",
-      "designation": "Easter 7",
-      "kind": "sunday",
-      "readings": {
-        "ot": "Acts 16:16-34",
-        "psalm": "Psalm 97",
-        "epistle": "Revelation 22:12-14, 16-17, 20-21",
-        "gospel": "John 17:20-26"
-      },
-      "notes": "Many congregations observe Ascension Sunday on this day (Acts 1:1-11 / Ps 47 or 93 / Eph 1:15-23 / Luke 24:44-53)."
-    },
-    {
-      "service_date": "2026-05-24",
-      "lectionary_year": "C",
-      "liturgical_season": "pentecost",
-      "designation": "Day of Pentecost",
-      "kind": "sunday",
-      "readings": {
-        "ot": "Acts 2:1-21",
-        "psalm": "Psalm 104:24-34, 35b",
-        "epistle": "Romans 8:14-17",
-        "gospel": "John 14:8-17, (25-27)"
-      },
-      "alternate_ot": "Genesis 11:1-9"
-    },
-    {
-      "service_date": "2026-05-31",
-      "lectionary_year": "C",
-      "liturgical_season": "ordinary",
-      "designation": "Trinity Sunday",
-      "kind": "sunday",
-      "readings": {
-        "ot": "Proverbs 8:1-4, 22-31",
-        "psalm": "Psalm 8",
-        "epistle": "Romans 5:1-5",
-        "gospel": "John 16:12-15"
+        "ot": "Acts 7:55-60",
+        "psalm": "Psalm 31:1-5, 15-16 (UMH 764)",
+        "epistle": "1 Peter 2:2-10",
+        "gospel": "John 14:1-14"
       }
     },
     {
-      "service_date": "2026-06-07",
-      "lectionary_year": "C",
-      "liturgical_season": "ordinary",
-      "designation": "Proper 5",
+      "service_date": "2026-05-10",
+      "lectionary_year": "A",
+      "liturgical_season": "easter",
+      "designation": "6th Sunday of Easter",
       "kind": "sunday",
+      "color": "white",
       "readings": {
-        "ot": "1 Kings 17:8-16, (17-24)",
-        "psalm": "Psalm 146",
-        "epistle": "Galatians 1:11-24",
-        "gospel": "Luke 7:11-17"
+        "ot": "Acts 17:22-31",
+        "psalm": "Psalm 66:8-20 (UMH 790)",
+        "epistle": "1 Peter 3:13-22",
+        "gospel": "John 14:15-21"
+      },
+      "observances": ["Mother's Day (USA)", "Festival of the Christian Home"]
+    },
+    {
+      "service_date": "2026-05-17",
+      "lectionary_year": "A",
+      "liturgical_season": "easter",
+      "designation": "Ascension Sunday",
+      "kind": "sunday",
+      "color": "white",
+      "readings": {
+        "ot": "Acts 1:1-11",
+        "psalm": "Psalm 47 or Psalm 93 (UMH 781)",
+        "epistle": "Ephesians 1:15-23",
+        "gospel": "Luke 24:44-53"
+      },
+      "alternate": {
+        "designation": "7th Sunday of Easter",
+        "readings": {
+          "ot": "Acts 1:6-14",
+          "psalm": "Psalm 68:1-10, 32-35 (UMH 792)",
+          "epistle": "1 Peter 4:12-14; 5:6-11",
+          "gospel": "John 17:1-11"
+        }
+      },
+      "notes": "Ascension Day proper falls Thursday May 14; Ascension Sunday is the standard transferred observance. The calendar lists 7th Sunday of Easter readings as an alternate."
+    },
+    {
+      "service_date": "2026-05-24",
+      "lectionary_year": "A",
+      "liturgical_season": "pentecost",
+      "designation": "Day of Pentecost",
+      "kind": "sunday",
+      "color": "red",
+      "readings": {
+        "ot": "Acts 2:1-21 or Numbers 11:24-30",
+        "psalm": "Psalm 104:24-34, 35b (UMH 826)",
+        "epistle": "1 Corinthians 12:3b-13",
+        "gospel": "John 7:37-39"
+      },
+      "observances": ["Heritage Sunday", "Aldersgate Day"]
+    },
+    {
+      "service_date": "2026-05-31",
+      "lectionary_year": "A",
+      "liturgical_season": "ordinary",
+      "designation": "Trinity Sunday",
+      "kind": "sunday",
+      "color": "white",
+      "readings": {
+        "ot": "Genesis 1:1-2:4a",
+        "psalm": "Psalm 8 (UMH 743)",
+        "epistle": "2 Corinthians 13:11-13",
+        "gospel": "Matthew 28:16-20"
+      },
+      "observances": ["Peace with Justice Sunday (offering)"]
+    },
+    {
+      "service_date": "2026-06-07",
+      "lectionary_year": "A",
+      "liturgical_season": "ordinary",
+      "designation": "2nd Sunday after Pentecost",
+      "kind": "sunday",
+      "color": "green",
+      "readings": {
+        "ot": "Genesis 12:1-9",
+        "psalm": "Psalm 33:1-12 (UMH 767)",
+        "epistle": "Romans 4:13-25",
+        "gospel": "Matthew 9:9-13, 18-26"
       }
     },
     {
       "service_date": "2026-06-14",
-      "lectionary_year": "C",
+      "lectionary_year": "A",
       "liturgical_season": "ordinary",
-      "designation": "Proper 6",
+      "designation": "3rd Sunday after Pentecost",
       "kind": "sunday",
+      "color": "green",
       "readings": {
-        "ot": "1 Kings 21:1-10, (11-14), 15-21a",
-        "psalm": "Psalm 5:1-8",
-        "epistle": "Galatians 2:15-21",
-        "gospel": "Luke 7:36-8:3"
+        "ot": "Genesis 18:1-15",
+        "psalm": "Psalm 116:1-2, 12-19 (UMH 837)",
+        "epistle": "Romans 5:1-8",
+        "gospel": "Matthew 9:35-10:8 (9-23)"
       }
     },
     {
       "service_date": "2026-06-21",
-      "lectionary_year": "C",
+      "lectionary_year": "A",
       "liturgical_season": "ordinary",
-      "designation": "Proper 7",
+      "designation": "4th Sunday after Pentecost",
       "kind": "sunday",
+      "color": "green",
       "readings": {
-        "ot": "1 Kings 19:1-4, (5-7), 8-15a",
-        "psalm": "Psalms 42 and 43",
-        "epistle": "Galatians 3:23-29",
-        "gospel": "Luke 8:26-39"
-      }
+        "ot": "Genesis 21:8-21",
+        "psalm": "Psalm 86:1-10, 16-17 or Psalm 17 (UMH 749)",
+        "epistle": "Romans 6:1b-11",
+        "gospel": "Matthew 10:24-39"
+      },
+      "observances": ["Father's Day (USA)"]
     },
     {
       "service_date": "2026-06-28",
-      "lectionary_year": "C",
+      "lectionary_year": "A",
       "liturgical_season": "ordinary",
-      "designation": "Proper 8",
+      "designation": "5th Sunday after Pentecost",
       "kind": "sunday",
+      "color": "green",
       "readings": {
-        "ot": "2 Kings 2:1-2, 6-14",
-        "psalm": "Psalm 77:1-2, 11-20",
-        "epistle": "Galatians 5:1, 13-25",
-        "gospel": "Luke 9:51-62"
-      }
+        "ot": "Genesis 22:1-14",
+        "psalm": "Psalm 13 (UMH 746)",
+        "epistle": "Romans 6:12-23",
+        "gospel": "Matthew 10:40-42"
+      },
+      "observances": ["John Wesley's Birthday (1703)"]
     },
     {
       "service_date": "2026-07-05",
-      "lectionary_year": "C",
+      "lectionary_year": "A",
       "liturgical_season": "ordinary",
-      "designation": "Proper 9",
+      "designation": "6th Sunday after Pentecost",
       "kind": "sunday",
+      "color": "green",
       "readings": {
-        "ot": "2 Kings 5:1-14",
-        "psalm": "Psalm 30",
-        "epistle": "Galatians 6:(1-6), 7-16",
-        "gospel": "Luke 10:1-11, 16-20"
+        "ot": "Genesis 24:34-38, 42-49, 58-67",
+        "psalm": "Psalm 45:10-17 or Psalm 72 (UMH 795)",
+        "epistle": "Romans 7:15-25a",
+        "gospel": "Matthew 11:16-19, 25-30"
       }
     },
     {
       "service_date": "2026-07-12",
-      "lectionary_year": "C",
+      "lectionary_year": "A",
       "liturgical_season": "ordinary",
-      "designation": "Proper 10",
+      "designation": "7th Sunday after Pentecost",
       "kind": "sunday",
+      "color": "green",
       "readings": {
-        "ot": "Amos 7:7-17",
-        "psalm": "Psalm 82",
-        "epistle": "Colossians 1:1-14",
-        "gospel": "Luke 10:25-37"
+        "ot": "Genesis 25:19-34",
+        "psalm": "Psalm 119:105-112 or Psalm 25 (UMH 756)",
+        "epistle": "Romans 8:1-11",
+        "gospel": "Matthew 13:1-9, 18-23"
       }
     },
     {
       "service_date": "2026-07-19",
-      "lectionary_year": "C",
+      "lectionary_year": "A",
       "liturgical_season": "ordinary",
-      "designation": "Proper 11",
+      "designation": "8th Sunday after Pentecost",
       "kind": "sunday",
+      "color": "green",
       "readings": {
-        "ot": "Amos 8:1-12",
-        "psalm": "Psalm 52",
-        "epistle": "Colossians 1:15-28",
-        "gospel": "Luke 10:38-42"
+        "ot": "Genesis 28:10-19a",
+        "psalm": "Psalm 139:1-12, 23-24 (UMH 854)",
+        "epistle": "Romans 8:12-25",
+        "gospel": "Matthew 13:24-30, 36-43"
       }
     },
     {
       "service_date": "2026-07-26",
-      "lectionary_year": "C",
+      "lectionary_year": "A",
       "liturgical_season": "ordinary",
-      "designation": "Proper 12",
+      "designation": "9th Sunday after Pentecost",
       "kind": "sunday",
+      "color": "green",
       "readings": {
-        "ot": "Hosea 1:2-10",
-        "psalm": "Psalm 85",
-        "epistle": "Colossians 2:6-15, (16-19)",
-        "gospel": "Luke 11:1-13"
+        "ot": "Genesis 29:15-28",
+        "psalm": "Psalm 105:1-11, 45b (UMH 828)",
+        "epistle": "Romans 8:26-39",
+        "gospel": "Matthew 13:31-33, 44-52"
       }
     },
     {
       "service_date": "2026-08-02",
-      "lectionary_year": "C",
+      "lectionary_year": "A",
       "liturgical_season": "ordinary",
-      "designation": "Proper 13",
+      "designation": "10th Sunday after Pentecost",
       "kind": "sunday",
+      "color": "green",
       "readings": {
-        "ot": "Hosea 11:1-11",
-        "psalm": "Psalm 107:1-9, 43",
-        "epistle": "Colossians 3:1-11",
-        "gospel": "Luke 12:13-21"
+        "ot": "Genesis 32:22-31",
+        "psalm": "Psalm 17:1-7, 15 (UMH 749)",
+        "epistle": "Romans 9:1-5",
+        "gospel": "Matthew 14:13-21"
       }
     },
     {
       "service_date": "2026-08-09",
-      "lectionary_year": "C",
+      "lectionary_year": "A",
       "liturgical_season": "ordinary",
-      "designation": "Proper 14",
+      "designation": "11th Sunday after Pentecost",
       "kind": "sunday",
+      "color": "green",
       "readings": {
-        "ot": "Isaiah 1:1, 10-20",
-        "psalm": "Psalm 50:1-8, 22-23",
-        "epistle": "Hebrews 11:1-3, 8-16",
-        "gospel": "Luke 12:32-40"
+        "ot": "Genesis 37:1-4, 12-28",
+        "psalm": "Psalm 105:1-6, 16-22, 45b (UMH 828)",
+        "epistle": "Romans 10:5-15",
+        "gospel": "Matthew 14:22-33"
+      }
+    },
+    {
+      "service_date": "2026-08-16",
+      "lectionary_year": "A",
+      "liturgical_season": "ordinary",
+      "designation": "12th Sunday after Pentecost",
+      "kind": "sunday",
+      "color": "green",
+      "readings": {
+        "ot": "Genesis 45:1-15",
+        "psalm": "Psalm 133 (UMH 850)",
+        "epistle": "Romans 11:1-2a, 29-32",
+        "gospel": "Matthew 15:(10-20), 21-28"
+      }
+    },
+    {
+      "service_date": "2026-08-23",
+      "lectionary_year": "A",
+      "liturgical_season": "ordinary",
+      "designation": "13th Sunday after Pentecost",
+      "kind": "sunday",
+      "color": "green",
+      "readings": {
+        "ot": "Exodus 1:8-2:10",
+        "psalm": "Psalm 124 (UMH 846)",
+        "epistle": "Romans 12:1-8",
+        "gospel": "Matthew 16:13-20"
+      }
+    },
+    {
+      "service_date": "2026-08-30",
+      "lectionary_year": "A",
+      "liturgical_season": "ordinary",
+      "designation": "14th Sunday after Pentecost",
+      "kind": "sunday",
+      "color": "green",
+      "readings": {
+        "ot": "Exodus 3:1-15",
+        "psalm": "Psalm 105:1-6, 23-26, 45b (UMH 828)",
+        "epistle": "Romans 12:9-21",
+        "gospel": "Matthew 16:21-28"
+      }
+    },
+    {
+      "service_date": "2026-09-06",
+      "lectionary_year": "A",
+      "liturgical_season": "ordinary",
+      "designation": "15th Sunday after Pentecost",
+      "kind": "sunday",
+      "color": "green",
+      "readings": {
+        "ot": "Exodus 12:1-14",
+        "psalm": "Psalm 149 or Psalm 148 (UMH 861)",
+        "epistle": "Romans 13:8-14",
+        "gospel": "Matthew 18:15-20"
+      }
+    },
+    {
+      "service_date": "2026-09-13",
+      "lectionary_year": "A",
+      "liturgical_season": "ordinary",
+      "designation": "16th Sunday after Pentecost",
+      "kind": "sunday",
+      "color": "green",
+      "readings": {
+        "ot": "Exodus 14:19-31; Exodus 15:1b-11, 20-21 (UMH 135)",
+        "psalm": "(included with OT)",
+        "epistle": "Romans 14:1-12",
+        "gospel": "Matthew 18:21-35"
+      }
+    },
+    {
+      "service_date": "2026-09-20",
+      "lectionary_year": "A",
+      "liturgical_season": "ordinary",
+      "designation": "17th Sunday after Pentecost",
+      "kind": "sunday",
+      "color": "green",
+      "readings": {
+        "ot": "Exodus 16:2-15",
+        "psalm": "Psalm 105:1-6, 37-45 or Psalm 78 (UMH 799)",
+        "epistle": "Philippians 1:21-30",
+        "gospel": "Matthew 20:1-16"
+      }
+    },
+    {
+      "service_date": "2026-09-27",
+      "lectionary_year": "A",
+      "liturgical_season": "ordinary",
+      "designation": "18th Sunday after Pentecost",
+      "kind": "sunday",
+      "color": "green",
+      "readings": {
+        "ot": "Exodus 17:1-7",
+        "psalm": "Psalm 78:1-4, 12-16 (UMH 799)",
+        "epistle": "Philippians 2:1-13",
+        "gospel": "Matthew 21:23-32"
+      }
+    },
+    {
+      "service_date": "2026-10-04",
+      "lectionary_year": "A",
+      "liturgical_season": "ordinary",
+      "designation": "19th Sunday after Pentecost",
+      "kind": "sunday",
+      "color": "green",
+      "readings": {
+        "ot": "Exodus 20:1-4, 7-9, 12-20",
+        "psalm": "Psalm 19 (UMH 750)",
+        "epistle": "Philippians 3:4b-14",
+        "gospel": "Matthew 21:33-46"
+      },
+      "observances": ["World Communion Sunday (offering)"]
+    },
+    {
+      "service_date": "2026-10-11",
+      "lectionary_year": "A",
+      "liturgical_season": "ordinary",
+      "designation": "20th Sunday after Pentecost",
+      "kind": "sunday",
+      "color": "green",
+      "readings": {
+        "ot": "Exodus 32:1-14",
+        "psalm": "Psalm 106:1-6, 19-23 (UMH 829)",
+        "epistle": "Philippians 4:1-9",
+        "gospel": "Matthew 22:1-14"
+      },
+      "observances": ["Children's Sabbath"]
+    },
+    {
+      "service_date": "2026-10-18",
+      "lectionary_year": "A",
+      "liturgical_season": "ordinary",
+      "designation": "21st Sunday after Pentecost",
+      "kind": "sunday",
+      "color": "green",
+      "readings": {
+        "ot": "Exodus 33:12-23",
+        "psalm": "Psalm 99 (UMH 819)",
+        "epistle": "1 Thessalonians 1:1-10",
+        "gospel": "Matthew 22:15-22"
+      },
+      "observances": ["Laity Sunday"]
+    },
+    {
+      "service_date": "2026-10-25",
+      "lectionary_year": "A",
+      "liturgical_season": "ordinary",
+      "designation": "22nd Sunday after Pentecost",
+      "kind": "sunday",
+      "color": "green",
+      "readings": {
+        "ot": "Deuteronomy 34:1-12",
+        "psalm": "Psalm 90:1-6, 13-17 (UMH 809)",
+        "epistle": "1 Thessalonians 2:1-8",
+        "gospel": "Matthew 22:34-46"
+      },
+      "observances": ["Reformation Sunday"]
+    },
+    {
+      "service_date": "2026-11-01",
+      "lectionary_year": "A",
+      "liturgical_season": "ordinary",
+      "designation": "23rd Sunday after Pentecost",
+      "kind": "sunday",
+      "color": "green",
+      "readings": {
+        "ot": "Joshua 3:7-17",
+        "psalm": "Psalm 107:1-7, 33-37 (UMH 830)",
+        "epistle": "1 Thessalonians 2:9-13",
+        "gospel": "Matthew 23:1-12"
+      },
+      "alternate": {
+        "designation": "All Saints Sunday",
+        "color": "white",
+        "readings": {
+          "ot": "Revelation 7:9-17",
+          "psalm": "Psalm 34:1-10, 22 (UMH 769)",
+          "epistle": "1 John 3:1-3",
+          "gospel": "Matthew 5:1-12"
+        }
+      }
+    },
+    {
+      "service_date": "2026-11-08",
+      "lectionary_year": "A",
+      "liturgical_season": "ordinary",
+      "designation": "24th Sunday after Pentecost",
+      "kind": "sunday",
+      "color": "green",
+      "readings": {
+        "ot": "Joshua 24:1-3a, 14-25",
+        "psalm": "Psalm 78:1-7 (UMH 799)",
+        "epistle": "1 Thessalonians 4:13-18",
+        "gospel": "Matthew 25:1-13"
+      },
+      "observances": ["Organ and Tissue Donor Sunday"]
+    },
+    {
+      "service_date": "2026-11-15",
+      "lectionary_year": "A",
+      "liturgical_season": "ordinary",
+      "designation": "25th Sunday after Pentecost",
+      "kind": "sunday",
+      "color": "green",
+      "readings": {
+        "ot": "Judges 4:1-7",
+        "psalm": "Psalm 123 or Psalm 76 (UMH 797)",
+        "epistle": "1 Thessalonians 5:1-11",
+        "gospel": "Matthew 25:14-30"
+      }
+    },
+    {
+      "service_date": "2026-11-22",
+      "lectionary_year": "A",
+      "liturgical_season": "ordinary",
+      "designation": "Christ the King / Reign of Christ Sunday",
+      "kind": "sunday",
+      "color": "white",
+      "readings": {
+        "ot": "Ezekiel 34:11-16, 20-24",
+        "psalm": "Psalm 100 (UMH 821)",
+        "epistle": "Ephesians 1:15-23",
+        "gospel": "Matthew 25:31-46"
+      }
+    },
+    {
+      "service_date": "2026-11-29",
+      "lectionary_year": "B",
+      "liturgical_season": "advent",
+      "designation": "1st Sunday of Advent",
+      "kind": "sunday",
+      "color": "purple",
+      "readings": {
+        "ot": "Isaiah 64:1-9",
+        "psalm": "Psalm 80:1-7, 17-19 (UMH 801)",
+        "epistle": "1 Corinthians 1:3-9",
+        "gospel": "Mark 13:24-37"
+      },
+      "observances": [
+        "Beginning of Lectionary Year B",
+        "United Methodist Student Day (offering)"
+      ]
+    },
+    {
+      "service_date": "2026-12-06",
+      "lectionary_year": "B",
+      "liturgical_season": "advent",
+      "designation": "2nd Sunday of Advent",
+      "kind": "sunday",
+      "color": "purple",
+      "readings": {
+        "ot": "Isaiah 40:1-11",
+        "psalm": "Psalm 85:1-2, 8-13 (UMH 806)",
+        "epistle": "2 Peter 3:8-15a",
+        "gospel": "Mark 1:1-8"
+      }
+    },
+    {
+      "service_date": "2026-12-13",
+      "lectionary_year": "B",
+      "liturgical_season": "advent",
+      "designation": "3rd Sunday of Advent",
+      "kind": "sunday",
+      "color": "purple",
+      "readings": {
+        "ot": "Isaiah 61:1-4, 8-11",
+        "psalm": "Psalm 126 (UMH 847)",
+        "epistle": "1 Thessalonians 5:16-24",
+        "gospel": "John 1:6-8, 19-28"
+      }
+    },
+    {
+      "service_date": "2026-12-20",
+      "lectionary_year": "B",
+      "liturgical_season": "advent",
+      "designation": "4th Sunday of Advent",
+      "kind": "sunday",
+      "color": "purple",
+      "readings": {
+        "ot": "2 Samuel 7:1-11, 16",
+        "psalm": "Luke 1:47-55 (UMH 199)",
+        "epistle": "Romans 16:25-27",
+        "gospel": "Luke 1:26-38"
+      }
+    },
+    {
+      "service_date": "2026-12-24",
+      "lectionary_year": "B",
+      "liturgical_season": "christmas",
+      "designation": "Christmas Eve",
+      "kind": "special",
+      "color": "white",
+      "readings": {
+        "ot": "Isaiah 9:2-7",
+        "psalm": "Psalm 96 (UMH 815)",
+        "epistle": "Titus 2:11-14",
+        "gospel": "Luke 2:1-20"
+      }
+    },
+    {
+      "service_date": "2026-12-25",
+      "lectionary_year": "B",
+      "liturgical_season": "christmas",
+      "designation": "Christmas Day",
+      "kind": "special",
+      "color": "white",
+      "readings": {
+        "ot": "Isaiah 52:7-10",
+        "psalm": "Psalm 98 (UMH 818)",
+        "epistle": "Hebrews 1:1-4 (5-12)",
+        "gospel": "John 1:1-14"
+      }
+    },
+    {
+      "service_date": "2026-12-27",
+      "lectionary_year": "B",
+      "liturgical_season": "christmas",
+      "designation": "1st Sunday after Christmas Day",
+      "kind": "sunday",
+      "color": "white",
+      "readings": {
+        "ot": "Isaiah 61:10-62:3",
+        "psalm": "Psalm 148 (UMH 861)",
+        "epistle": "Galatians 4:4-7",
+        "gospel": "Luke 2:22-40"
+      }
+    },
+    {
+      "service_date": "2026-12-31",
+      "lectionary_year": "B",
+      "liturgical_season": "christmas",
+      "designation": "Watchnight / New Year's Eve",
+      "kind": "special",
+      "color": "white",
+      "readings": {
+        "ot": "Ecclesiastes 3:1-13",
+        "psalm": "Psalm 8 (UMH 743)",
+        "epistle": "Revelation 21:1-6a",
+        "gospel": "Matthew 25:31-46"
       }
     }
   ]
