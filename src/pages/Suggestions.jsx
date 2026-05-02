@@ -383,6 +383,17 @@ function SuggestionCard({ suggestion, role, userId, allDates, setError, reload }
         <p className="mt-2 text-sm text-gray-700 whitespace-pre-wrap">{suggestion.body}</p>
       )}
 
+      {suggestion.added_to_bulletin_id && (
+        <p className="mt-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded px-2 py-1">
+          ✓ Added to bulletin
+          {suggestion.added_at && (
+            <span className="text-gray-500 ml-1">
+              on {new Date(suggestion.added_at).toLocaleDateString()}
+            </span>
+          )}
+        </p>
+      )}
+
       {suggestion.review_notes && suggestion.status !== 'pending' && (
         <p className="mt-2 text-xs text-gray-600 italic">
           Review note: {suggestion.review_notes}
