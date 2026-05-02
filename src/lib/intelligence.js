@@ -5,6 +5,11 @@
 // gates rendering; these helpers are RLS-scoped — staff can read all
 // sermons + resources via the existing policies).
 //
+// Sermons are bucketed by whether they've been preached at WFUMC (i.e.,
+// linked to a bulletin in this app via a preaching row with non-null
+// bulletin_id). Sermons may also link out to the Sermon Archive app
+// when a manuscript is attached (URL controlled by VITE_SERMON_ARCHIVE_URL).
+//
 // Each lookup is best-effort: we cap result counts and degrade gracefully
 // if a query fails (the panel still shows the other sections).
 
@@ -16,20 +21,22 @@ import {
   TIER_LABELS,
 } from './scripture';
 
-// Pull sermons that might match `targetRef` (parsed scripture).
-//
-// We do an initial coarse server-side filter on book name (cheaper than
-// pulling every sermon ever), then score client-side against the parsed
-// ref. The set of returned books is small (1 per parsed ref), so the
-// query is bounded.
-//
-// Returns: [{ sermon, tier, ownerIsCurrentUser }]
-async function querySermonsByRef(targetRefs, currentUserId) {
+// Sermon Archive base URL — set via env var. If unset, sermon links are
+// hidden (no broken URLs). Trailing slash stripped for clean concatenation.
+const SERMON_ARCHIVE_URL = (
+  import.meta.env.VITE_SERMON_ARCHIVE_URL || ''
+).replace(/\/$/, '');
+
+export function sermonArchiveUrl(sermonId) {
+  if (!SERMON_ARCHIVE_URL) return null;
+  return `${SERMON_ARCHIVE_URL}/sermons/${sermonId}`;
+}
+
+// Pull sermons that might match `targetRefs` (parsed scripture). Coarse
+// server-side ILIKE on book name, score client-side.
+async function querySermonsByRef(targetRefs) {
   if (!targetRefs || targetRefs.length === 0) return [];
 
-  // Build OR pattern: book name match. We use ILIKE for fuzzy match
-  // so "John" finds "John 3:16", "John 4", etc. Using PostgREST's
-  // OR syntax: scripture_reference.ilike.%John%,...
   const books = [...new Set(targetRefs.map((r) => r.book))];
   const orParts = books.map(
     (b) => `scripture_reference.ilike.%${b.replace(/[%_]/g, '')}%`
@@ -40,14 +47,16 @@ async function querySermonsByRef(targetRefs, currentUserId) {
     supabase
       .from('sermons')
       .select(
-        'id, title, scripture_reference, theme, preached_at, owner_user_id'
+        // Pull the manuscript columns (just to know if they're set — we
+        // don't render the body) so we can show a "has manuscript" hint
+        // and conditionally link.
+        'id, title, scripture_reference, theme, preached_at, owner_user_id, manuscript_text, manuscript_url'
       )
       .or(orClause)
       .order('preached_at', { ascending: false, nullsFirst: false })
       .limit(200)
   );
   if (error) {
-    // Don't blow up the whole panel — log and return empty.
     // eslint-disable-next-line no-console
     console.warn('querySermonsByRef:', error.message);
     return [];
@@ -61,12 +70,17 @@ async function querySermonsByRef(targetRefs, currentUserId) {
     const tier = bestOverlapTier(targetRefs, candidateRefs);
     if (tier === 'none') continue;
     out.push({
-      sermon: s,
+      sermon: {
+        ...s,
+        // Strip the actual manuscript text from the result — we only
+        // need a boolean. Keeps the in-memory footprint small for big
+        // result sets.
+        manuscript_text: undefined,
+        hasManuscript: Boolean(s.manuscript_text || s.manuscript_url),
+      },
       tier,
-      ownerIsCurrentUser: s.owner_user_id === currentUserId,
     });
   }
-  // Strongest tier first, then most recent
   out.sort((a, b) => {
     const tr = TIER_RANK[b.tier] - TIER_RANK[a.tier];
     if (tr !== 0) return tr;
@@ -77,9 +91,40 @@ async function querySermonsByRef(targetRefs, currentUserId) {
   return out;
 }
 
-// Pull resources whose scripture_refs string overlaps `targetRefs`.
-// Same coarse-filter approach as sermons — server-side ILIKE on book
-// name(s), score client-side.
+// Pull preachings for a list of sermon ids. Returns:
+//   { sermonId → { wfumcDates: [date,...], allDates: [date,...] } }
+// where wfumcDates are preachings with non-null bulletin_id (i.e. used
+// in a bulletin in this app). allDates is every preaching including
+// historical imports without a bulletin link.
+async function queryPreachingsBySermonIds(sermonIds) {
+  if (!sermonIds || sermonIds.length === 0) return {};
+  const { data, error } = await withTimeout(
+    supabase
+      .from('preachings')
+      .select('sermon_id, bulletin_id, preached_at')
+      .in('sermon_id', sermonIds)
+  );
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.warn('queryPreachingsBySermonIds:', error.message);
+    return {};
+  }
+  const out = {};
+  for (const p of data ?? []) {
+    if (!out[p.sermon_id]) out[p.sermon_id] = { wfumcDates: [], allDates: [] };
+    if (p.preached_at) out[p.sermon_id].allDates.push(p.preached_at);
+    if (p.bulletin_id && p.preached_at)
+      out[p.sermon_id].wfumcDates.push(p.preached_at);
+  }
+  // Sort each list descending so [0] is most recent
+  for (const id of Object.keys(out)) {
+    out[id].wfumcDates.sort().reverse();
+    out[id].allDates.sort().reverse();
+  }
+  return out;
+}
+
+// Resources by scripture: same coarse filter approach.
 async function queryResourcesByRef(targetRefs) {
   if (!targetRefs || targetRefs.length === 0) return [];
 
@@ -115,24 +160,15 @@ async function queryResourcesByRef(targetRefs) {
   return out;
 }
 
-// Pull resources whose `themes` array overlaps any of the given theme
-// strings. Postgres array overlap (ILIKE for fuzzy, since themes are
-// free-form strings).
+// Resources by theme overlap — exact array overlap on themes[].
 async function queryResourcesByTheme(themeTerms) {
   if (!themeTerms || themeTerms.length === 0) return [];
 
-  // Each term: themes.cs.{term}  (contains array element exactly).
-  // We also try a fallback fuzzy search via title/content ILIKE for
-  // theme strings that don't have exact matches. Keep it simple:
-  // exact theme tag match using the .ov.{...} contains-overlap operator.
   const cleanTerms = themeTerms
     .map((t) => t?.trim())
     .filter(Boolean)
     .map((t) => t.toLowerCase());
   if (cleanTerms.length === 0) return [];
-
-  // PostgREST: themes=ov.{a,b,c} → array overlap
-  const ovList = `{${cleanTerms.map((t) => `"${t.replace(/"/g, '\\"')}"`).join(',')}}`;
 
   const { data, error } = await withTimeout(
     supabase
@@ -143,19 +179,16 @@ async function queryResourcesByTheme(themeTerms) {
   );
   if (error) {
     // eslint-disable-next-line no-console
-    console.warn('queryResourcesByTheme:', error.message, 'tried', ovList);
+    console.warn('queryResourcesByTheme:', error.message);
     return [];
   }
   return (data ?? []).map((r) => ({ resource: r, tier: 'theme_match' }));
 }
 
-// Build the theme search terms from a worship_plan's grouping themes.
-// `selectedThemes` is an array of theme_option rows.
 function themeTermsFromSelections(selectedThemes) {
   const terms = new Set();
   for (const t of selectedThemes ?? []) {
     if (t.title) {
-      // Add the title itself, plus each significant word (>3 chars).
       terms.add(t.title.toLowerCase());
       for (const w of t.title.toLowerCase().split(/\s+/)) {
         if (w.length > 3) terms.add(w);
@@ -165,50 +198,60 @@ function themeTermsFromSelections(selectedThemes) {
   return [...terms];
 }
 
-// Main entry point. Returns:
+// Main entry. Returns:
 //   {
-//     wfumcSermons: [{sermon, tier}],
-//     otherSermons: [{sermon, tier}],
+//     wfumcSermons: [{ sermon, tier, wfumcDates, allDates }],
+//     otherSermons: [{ sermon, tier, wfumcDates, allDates }],
 //     resourcesByText: [{resource, tier}],
 //     resourcesByTheme: [{resource, tier}],
+//     targetRefs, themeTerms,
 //   }
 //
-// `pastorUserId` is used to decide which sermons count as "WFUMC". If
-// you don't pass it, every sermon falls into otherSermons.
+// `pastorUserId` is no longer used for bucketing — kept in the signature
+// for future panels that want to highlight pastor-owned items.
 export async function loadIntelligence({
   scriptureReference,
   themes,
+  // eslint-disable-next-line no-unused-vars
   pastorUserId,
 }) {
   const targetRefs = parseRefs(scriptureReference);
   const themeTerms = themeTermsFromSelections(themes);
 
-  const [sermons, resourcesByText, resourcesByTheme] = await Promise.all([
-    targetRefs.length > 0
-      ? querySermonsByRef(targetRefs, pastorUserId)
-      : Promise.resolve([]),
-    targetRefs.length > 0
-      ? queryResourcesByRef(targetRefs)
-      : Promise.resolve([]),
-    themeTerms.length > 0
-      ? queryResourcesByTheme(themeTerms)
-      : Promise.resolve([]),
-  ]);
+  const [matchedSermons, resourcesByText, resourcesByTheme] = await Promise.all(
+    [
+      targetRefs.length > 0 ? querySermonsByRef(targetRefs) : Promise.resolve([]),
+      targetRefs.length > 0
+        ? queryResourcesByRef(targetRefs)
+        : Promise.resolve([]),
+      themeTerms.length > 0
+        ? queryResourcesByTheme(themeTerms)
+        : Promise.resolve([]),
+    ]
+  );
 
-  // Split sermons by ownership
+  // Pull preachings for the matched sermons (one round-trip).
+  const sermonIds = matchedSermons.map((m) => m.sermon.id);
+  const preachings = await queryPreachingsBySermonIds(sermonIds);
+
+  // Bucket sermons by WFUMC preaching presence
   const wfumcSermons = [];
   const otherSermons = [];
-  for (const s of sermons) {
-    if (pastorUserId && s.sermon.owner_user_id === pastorUserId) {
-      wfumcSermons.push(s);
+  for (const m of matchedSermons) {
+    const p = preachings[m.sermon.id] || { wfumcDates: [], allDates: [] };
+    const enriched = { ...m, wfumcDates: p.wfumcDates, allDates: p.allDates };
+    if (p.wfumcDates.length > 0) {
+      wfumcSermons.push(enriched);
     } else {
-      otherSermons.push(s);
+      otherSermons.push(enriched);
     }
   }
 
-  // De-duplicate resources between text and theme matches.
+  // De-dupe resources between text and theme matches.
   const textIds = new Set(resourcesByText.map((r) => r.resource.id));
-  const themesDedup = resourcesByTheme.filter((r) => !textIds.has(r.resource.id));
+  const themesDedup = resourcesByTheme.filter(
+    (r) => !textIds.has(r.resource.id)
+  );
 
   return {
     wfumcSermons,
@@ -223,8 +266,8 @@ export async function loadIntelligence({
 // Re-export tier constants for the panel UI.
 export { TIER_RANK, TIER_LABELS };
 
-// Resolve the pastor's user_id by reading the staff_profiles table.
-// Cached for the session (the panel calls this once per page load).
+// Resolve the pastor's user_id (cached). Kept for potential future use
+// even though current bucketing no longer needs it.
 let _pastorIdCache = null;
 let _pastorIdInflight = null;
 export async function getPastorUserId() {

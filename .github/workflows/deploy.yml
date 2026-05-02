@@ -36,6 +36,10 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_BASE_PATH: /${{ github.event.repository.name }}/
+          # Sermon Archive URL — used by the intelligence panel to link
+          # sermon titles to their detail page. Hardcoded here (not a
+          # secret) because it's just the public Pages URL.
+          VITE_SERMON_ARCHIVE_URL: https://colporteur.github.io/wfumc-sermons/
         run: npm run build
 
       - name: Upload Pages artifact

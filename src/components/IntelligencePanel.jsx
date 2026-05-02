@@ -1,23 +1,27 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   loadIntelligence,
   getPastorUserId,
+  sermonArchiveUrl,
   TIER_LABELS,
 } from '../lib/intelligence';
 
 // Pastor-only intelligence panel — collapsible, lazy-loaded.
 //
 // Lives inside WeekCard. Three sections:
-//   * WFUMC sermons matching this week's text (owned by the pastor)
-//   * Other sermons matching (e.g., Todd's wife's archive)
-//   * Resources matching the text or the selected theme
+//   * WFUMC sermons  — sermons preached at WFUMC (any preaching with
+//                      bulletin_id set). Most recent preaching date shown.
+//   * Other sermons  — every other matching sermon. May include sermons
+//                      preached at WFUMC historically without a linked
+//                      bulletin row; the link to the Sermon Archive
+//                      shows the full preaching history.
+//   * Resources matching the text (scripture overlap)
+//   * Resources matching the theme (tag overlap with selected theme)
 //
-// Lazy: doesn't query until the user opens the panel. Once opened, the
-// data sticks for the lifetime of the WeekCard (no refetch on collapse).
-export default function IntelligencePanel({
-  scriptureReference,
-  themes,
-}) {
+// Each section defaults to verse-overlap matches only. A "+ N chapter,
+// + M book" expander reveals wider matches when the pastor wants them.
+// Sermons with a manuscript link out to the Sermon Archive.
+export default function IntelligencePanel({ scriptureReference, themes }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -49,7 +53,6 @@ export default function IntelligencePanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // If neither text nor theme is set, there's nothing to look up.
   const hasSomething =
     (scriptureReference && scriptureReference.trim()) ||
     (themes && themes.length > 0);
@@ -67,7 +70,8 @@ export default function IntelligencePanel({
         {open && data && (
           <span className="text-gray-500 font-normal ml-1">
             ({data.wfumcSermons.length + data.otherSermons.length} sermons,{' '}
-            {data.resourcesByText.length + data.resourcesByTheme.length} resources)
+            {data.resourcesByText.length + data.resourcesByTheme.length}{' '}
+            resources)
           </span>
         )}
       </button>
@@ -76,19 +80,17 @@ export default function IntelligencePanel({
           {loading && (
             <p className="text-xs text-gray-500 italic">Searching…</p>
           )}
-          {error && (
-            <p className="text-xs text-red-600">{error}</p>
-          )}
+          {error && <p className="text-xs text-red-600">{error}</p>}
           {!loading && !error && data && (
             <>
               <SermonSection
                 title="WFUMC sermons"
-                emptyHint="No prior WFUMC sermons match this text."
+                emptyHint="No prior WFUMC-bulletin sermons match this text."
                 results={data.wfumcSermons}
               />
               <SermonSection
-                title="Other sermons"
-                emptyHint="No other-archive sermons match this text."
+                title="Other matching sermons"
+                emptyHint="No other sermons in the archive match this text."
                 results={data.otherSermons}
               />
               <ResourceSection
@@ -118,7 +120,7 @@ export default function IntelligencePanel({
   );
 }
 
-// ---------- sermon section ----------
+// ---------- shared ----------
 
 const TIER_BADGE = {
   verse_overlap: 'bg-green-100 text-green-800',
@@ -126,99 +128,6 @@ const TIER_BADGE = {
   same_book: 'bg-gray-100 text-gray-700',
   theme_match: 'bg-amber-100 text-amber-800',
 };
-
-function SermonSection({ title, emptyHint, results }) {
-  return (
-    <div>
-      <p className="text-[10px] uppercase tracking-wide text-gray-500 mb-1">
-        {title} ({results.length})
-      </p>
-      {results.length === 0 ? (
-        <p className="text-xs text-gray-500 italic">{emptyHint}</p>
-      ) : (
-        <ul className="space-y-1">
-          {results.slice(0, 8).map(({ sermon, tier }) => (
-            <li
-              key={sermon.id}
-              className="flex items-baseline gap-2 py-0.5"
-            >
-              <span
-                className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded ${TIER_BADGE[tier] || ''}`}
-                title={TIER_LABELS[tier] || tier}
-              >
-                {tierShort(tier)}
-              </span>
-              <span className="text-sm text-umc-900 truncate">
-                {sermon.title || '(untitled)'}
-              </span>
-              <span className="text-xs text-gray-500 truncate">
-                {sermon.scripture_reference}
-                {sermon.preached_at && ` · ${sermon.preached_at}`}
-              </span>
-            </li>
-          ))}
-          {results.length > 8 && (
-            <li className="text-xs text-gray-500 italic">
-              + {results.length - 8} more
-            </li>
-          )}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-// ---------- resource section ----------
-
-function ResourceSection({ title, emptyHint, results, isThemeMatch }) {
-  return (
-    <div>
-      <p className="text-[10px] uppercase tracking-wide text-gray-500 mb-1">
-        {title} ({results.length})
-      </p>
-      {results.length === 0 ? (
-        <p className="text-xs text-gray-500 italic">{emptyHint}</p>
-      ) : (
-        <ul className="space-y-1">
-          {results.slice(0, 8).map(({ resource, tier }) => (
-            <li
-              key={resource.id}
-              className="flex items-baseline gap-2 py-0.5"
-            >
-              <span
-                className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded ${
-                  TIER_BADGE[tier] || (isThemeMatch ? TIER_BADGE.theme_match : '')
-                }`}
-                title={TIER_LABELS[tier] || tier}
-              >
-                {tierShort(tier)}
-              </span>
-              <span className="text-[10px] uppercase tracking-wide text-gray-500">
-                {resource.resource_type}
-              </span>
-              <span className="text-sm text-umc-900 truncate">
-                {resource.title ||
-                  (resource.content
-                    ? resource.content.slice(0, 60) + (resource.content.length > 60 ? '…' : '')
-                    : '(untitled)')}
-              </span>
-              {resource.scripture_refs && (
-                <span className="text-xs text-gray-500 truncate">
-                  · {resource.scripture_refs}
-                </span>
-              )}
-            </li>
-          ))}
-          {results.length > 8 && (
-            <li className="text-xs text-gray-500 italic">
-              + {results.length - 8} more
-            </li>
-          )}
-        </ul>
-      )}
-    </div>
-  );
-}
 
 function tierShort(tier) {
   switch (tier) {
@@ -233,4 +142,232 @@ function tierShort(tier) {
     default:
       return tier;
   }
+}
+
+// Split a results array into "primary" (verse_overlap or theme_match)
+// and "wider" (same_chapter, same_book) buckets.
+function splitTiers(results) {
+  const primary = [];
+  const wider = [];
+  for (const r of results) {
+    if (r.tier === 'verse_overlap' || r.tier === 'theme_match') {
+      primary.push(r);
+    } else {
+      wider.push(r);
+    }
+  }
+  return { primary, wider };
+}
+
+// "+ 3 chapter, + 7 book" — the human-readable summary on the expander.
+function widerLabel(wider) {
+  const counts = wider.reduce(
+    (acc, r) => {
+      acc[r.tier] = (acc[r.tier] || 0) + 1;
+      return acc;
+    },
+    {}
+  );
+  const parts = [];
+  if (counts.same_chapter) parts.push(`${counts.same_chapter} chapter`);
+  if (counts.same_book) parts.push(`${counts.same_book} book`);
+  return parts.join(', ');
+}
+
+// ---------- sermon section ----------
+
+function SermonSection({ title, emptyHint, results }) {
+  const { primary, wider } = useMemo(() => splitTiers(results), [results]);
+  const [showWider, setShowWider] = useState(false);
+  const visible = showWider ? [...primary, ...wider] : primary;
+
+  return (
+    <div>
+      <p className="text-[10px] uppercase tracking-wide text-gray-500 mb-1">
+        {title} ({results.length})
+      </p>
+      {results.length === 0 ? (
+        <p className="text-xs text-gray-500 italic">{emptyHint}</p>
+      ) : primary.length === 0 && !showWider ? (
+        <p className="text-xs text-gray-500 italic">
+          No verse-level matches.{' '}
+          {wider.length > 0 && (
+            <button
+              type="button"
+              className="text-umc-700 hover:text-umc-900 underline"
+              onClick={() => setShowWider(true)}
+            >
+              Show + {widerLabel(wider)} matches
+            </button>
+          )}
+        </p>
+      ) : (
+        <>
+          <ul className="space-y-1">
+            {visible.slice(0, 12).map(({ sermon, tier, wfumcDates }) => (
+              <SermonRow
+                key={sermon.id}
+                sermon={sermon}
+                tier={tier}
+                wfumcDates={wfumcDates}
+              />
+            ))}
+            {visible.length > 12 && (
+              <li className="text-xs text-gray-500 italic">
+                + {visible.length - 12} more
+              </li>
+            )}
+          </ul>
+          {wider.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowWider((v) => !v)}
+              className="mt-1 text-xs text-umc-700 hover:text-umc-900 underline"
+            >
+              {showWider
+                ? `Hide wider matches`
+                : `Show + ${widerLabel(wider)} matches`}
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function SermonRow({ sermon, tier, wfumcDates }) {
+  const archiveUrl = sermon.hasManuscript ? sermonArchiveUrl(sermon.id) : null;
+  const titleNode = sermon.title || '(untitled)';
+  return (
+    <li className="flex items-baseline gap-2 py-0.5">
+      <span
+        className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded ${
+          TIER_BADGE[tier] || ''
+        }`}
+        title={TIER_LABELS[tier] || tier}
+      >
+        {tierShort(tier)}
+      </span>
+      {archiveUrl ? (
+        <a
+          href={archiveUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="text-sm text-umc-700 hover:text-umc-900 underline truncate"
+          title="Open in Sermon Archive"
+        >
+          {titleNode}
+        </a>
+      ) : (
+        <span className="text-sm text-umc-900 truncate">{titleNode}</span>
+      )}
+      {sermon.hasManuscript && (
+        <span
+          className="text-[10px] text-gray-500"
+          title="Has manuscript on file"
+        >
+          📄
+        </span>
+      )}
+      <span className="text-xs text-gray-500 truncate">
+        {sermon.scripture_reference}
+      </span>
+      {wfumcDates && wfumcDates.length > 0 && (
+        <span
+          className="text-[10px] text-green-700"
+          title={`Preached at WFUMC: ${wfumcDates.join(', ')}`}
+        >
+          · WFUMC {wfumcDates[0]}
+          {wfumcDates.length > 1 && ` (+${wfumcDates.length - 1})`}
+        </span>
+      )}
+    </li>
+  );
+}
+
+// ---------- resource section ----------
+
+function ResourceSection({ title, emptyHint, results, isThemeMatch }) {
+  const { primary, wider } = useMemo(
+    () => splitTiers(results),
+    [results]
+  );
+  const [showWider, setShowWider] = useState(false);
+  const visible = showWider ? [...primary, ...wider] : primary;
+
+  return (
+    <div>
+      <p className="text-[10px] uppercase tracking-wide text-gray-500 mb-1">
+        {title} ({results.length})
+      </p>
+      {results.length === 0 ? (
+        <p className="text-xs text-gray-500 italic">{emptyHint}</p>
+      ) : primary.length === 0 && !showWider ? (
+        <p className="text-xs text-gray-500 italic">
+          No verse-level matches.{' '}
+          {wider.length > 0 && (
+            <button
+              type="button"
+              className="text-umc-700 hover:text-umc-900 underline"
+              onClick={() => setShowWider(true)}
+            >
+              Show + {widerLabel(wider)} matches
+            </button>
+          )}
+        </p>
+      ) : (
+        <>
+          <ul className="space-y-1">
+            {visible.slice(0, 12).map(({ resource, tier }) => (
+              <li
+                key={resource.id}
+                className="flex items-baseline gap-2 py-0.5"
+              >
+                <span
+                  className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded ${
+                    TIER_BADGE[tier] ||
+                    (isThemeMatch ? TIER_BADGE.theme_match : '')
+                  }`}
+                  title={TIER_LABELS[tier] || tier}
+                >
+                  {tierShort(tier)}
+                </span>
+                <span className="text-[10px] uppercase tracking-wide text-gray-500">
+                  {resource.resource_type}
+                </span>
+                <span className="text-sm text-umc-900 truncate">
+                  {resource.title ||
+                    (resource.content
+                      ? resource.content.slice(0, 60) +
+                        (resource.content.length > 60 ? '…' : '')
+                      : '(untitled)')}
+                </span>
+                {resource.scripture_refs && (
+                  <span className="text-xs text-gray-500 truncate">
+                    · {resource.scripture_refs}
+                  </span>
+                )}
+              </li>
+            ))}
+            {visible.length > 12 && (
+              <li className="text-xs text-gray-500 italic">
+                + {visible.length - 12} more
+              </li>
+            )}
+          </ul>
+          {wider.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowWider((v) => !v)}
+              className="mt-1 text-xs text-umc-700 hover:text-umc-900 underline"
+            >
+              {showWider
+                ? 'Hide wider matches'
+                : `Show + ${widerLabel(wider)} matches`}
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  );
 }
