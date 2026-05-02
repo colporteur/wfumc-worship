@@ -91,17 +91,31 @@ async function querySermonsByRef(targetRefs) {
   return out;
 }
 
+// Substrings (case-insensitive) that mark a preaching's `location`
+// field as a WFUMC preaching. Free-form location strings get typed as
+// "Wedowee First UMC", "WFUMC", "Wedowee FUMC", etc., so we accept any
+// of these markers. Anything in this list, lowercased, is a hit.
+const WFUMC_LOCATION_MARKERS = ['wfumc', 'wedowee'];
+
+function locationIsWfumc(loc) {
+  if (!loc) return false;
+  const l = loc.toLowerCase();
+  return WFUMC_LOCATION_MARKERS.some((m) => l.includes(m));
+}
+
 // Pull preachings for a list of sermon ids. Returns:
 //   { sermonId → { wfumcDates: [date,...], allDates: [date,...] } }
-// where wfumcDates are preachings with non-null bulletin_id (i.e. used
-// in a bulletin in this app). allDates is every preaching including
-// historical imports without a bulletin link.
+// where a preaching counts as WFUMC if EITHER:
+//   * bulletin_id is set (used in a bulletin in this app), OR
+//   * location matches a WFUMC marker (historical imports without a
+//     bulletin link still surface).
+// allDates is every preaching with a date, including non-WFUMC ones.
 async function queryPreachingsBySermonIds(sermonIds) {
   if (!sermonIds || sermonIds.length === 0) return {};
   const { data, error } = await withTimeout(
     supabase
       .from('preachings')
-      .select('sermon_id, bulletin_id, preached_at')
+      .select('sermon_id, bulletin_id, preached_at, location')
       .in('sermon_id', sermonIds)
   );
   if (error) {
@@ -113,13 +127,17 @@ async function queryPreachingsBySermonIds(sermonIds) {
   for (const p of data ?? []) {
     if (!out[p.sermon_id]) out[p.sermon_id] = { wfumcDates: [], allDates: [] };
     if (p.preached_at) out[p.sermon_id].allDates.push(p.preached_at);
-    if (p.bulletin_id && p.preached_at)
+    const isWfumc = Boolean(p.bulletin_id) || locationIsWfumc(p.location);
+    if (isWfumc && p.preached_at) {
       out[p.sermon_id].wfumcDates.push(p.preached_at);
+    }
   }
-  // Sort each list descending so [0] is most recent
+  // Sort each list descending so [0] is most recent. De-dup in case
+  // someone has both a bulletin row and a location-tagged historical
+  // entry on the same date.
   for (const id of Object.keys(out)) {
-    out[id].wfumcDates.sort().reverse();
-    out[id].allDates.sort().reverse();
+    out[id].wfumcDates = [...new Set(out[id].wfumcDates)].sort().reverse();
+    out[id].allDates = [...new Set(out[id].allDates)].sort().reverse();
   }
   return out;
 }
