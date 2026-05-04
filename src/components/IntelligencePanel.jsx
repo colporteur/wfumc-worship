@@ -236,7 +236,11 @@ function SermonSection({ title, emptyHint, results }) {
 }
 
 function SermonRow({ sermon, tier, wfumcDates }) {
-  const archiveUrl = sermon.hasManuscript ? sermonArchiveUrl(sermon.id) : null;
+  // Always link the title to the Sermon Archive entry (even sermons
+  // without a manuscript on file — the archive page lets the pastor
+  // view + edit metadata, history, etc.). The 📄 indicator separately
+  // tells you whether a manuscript is attached.
+  const archiveUrl = sermonArchiveUrl(sermon.id);
   const titleNode = sermon.title || '(untitled)';
   return (
     <li className="flex items-baseline gap-2 py-0.5">
