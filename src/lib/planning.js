@@ -254,3 +254,79 @@ export const READING_LABELS = {
   gospel: 'Gospel',
   other: 'Other',
 };
+
+// Compound-reading helpers.
+//
+// The lectionary often offers alternates separated by " or ", e.g.
+//   "Acts 2:1-21 or Numbers 11:24-30"   (Pentecost OT)
+//   "Romans 8:14-17 or Acts 2:1-21"     (Pentecost Epistle)
+// These come into the app as a single reading string. The pastor may
+// want to (a) pick just one part as the chosen text, or (b) split the
+// option into two separate vote-able options after seeding.
+//
+// We split on a case-insensitive " or " surrounded by whitespace.
+// Refuses to split if either side ends up trivially short (avoids
+// false positives like "Mark 7:24-30 (or shorter: Mark 7:24-29)" —
+// that one would still split, since there's no good way to tell, but
+// the pastor can choose not to use the split affordance).
+const COMPOUND_SPLIT_RE = /\s+or\s+/i;
+
+export function splitCompoundReading(reference) {
+  if (!reference || typeof reference !== 'string') return [reference].filter(Boolean);
+  const parts = reference
+    .split(COMPOUND_SPLIT_RE)
+    .map((p) => p.trim())
+    .filter((p) => p && p.length >= 3);
+  if (parts.length < 2) return [reference];
+  return parts;
+}
+
+export function isCompoundReading(reference) {
+  return splitCompoundReading(reference).length > 1;
+}
+
+// Insert a partial RCL pick — used when pastor picks one half of a
+// compound reading ("Acts 2:1-21" out of "Acts 2:1-21 or Numbers 11:24-30").
+// The full compound is also seeded by the surrounding flow; this row
+// captures the specific half the pastor chose. Returns the new row.
+export async function addRclPartOption(serviceDate, readingKind, reference) {
+  const { data, error } = await withTimeout(
+    supabase
+      .from('planning_options')
+      .insert({
+        service_date: serviceDate,
+        source: 'rcl',
+        reading_kind: readingKind,
+        reference: reference.trim(),
+      })
+      .select()
+      .single()
+  );
+  if (error) throw error;
+  return data;
+}
+
+// Replace one option with N split options (same kind, same source).
+// Used when pastor clicks "Split" on a compound option that's already
+// been seeded into planning_options. Deletes the original, then inserts
+// the new ones.
+export async function splitOption(option) {
+  const parts = splitCompoundReading(option.reference);
+  if (parts.length < 2) {
+    throw new Error('This option is not a compound reading.');
+  }
+  const { error: delErr } = await withTimeout(
+    supabase.from('planning_options').delete().eq('id', option.id)
+  );
+  if (delErr) throw delErr;
+  const rows = parts.map((reference) => ({
+    service_date: option.service_date,
+    source: option.source,
+    reading_kind: option.reading_kind,
+    reference,
+  }));
+  const { error: insErr } = await withTimeout(
+    supabase.from('planning_options').insert(rows)
+  );
+  if (insErr) throw insErr;
+}

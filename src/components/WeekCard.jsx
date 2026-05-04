@@ -6,6 +6,10 @@ import {
   upsertWorshipPlan,
   toggleVote,
   addManualOption,
+  addRclPartOption,
+  splitOption,
+  splitCompoundReading,
+  isCompoundReading,
   READING_LABELS,
   deriveStatus,
 } from '../lib/planning';
@@ -103,15 +107,16 @@ export default function WeekCard({
     try {
       await seedRclOptions(week.service_date);
       const fresh = await loadPlanningStateOnly([week.service_date], userId);
-      const matched = (fresh.optionsByDate[week.service_date] ?? []).find(
+      let matched = (fresh.optionsByDate[week.service_date] ?? []).find(
         (o) =>
           o.reading_kind === kind &&
           o.reference.toLowerCase() === reference.toLowerCase()
       );
+      // No match means the pastor picked just one part of a compound
+      // reading (e.g., "Acts 2:1-21" out of "Acts 2:1-21 or Numbers 11:24-30").
+      // Insert the partial pick as its own RCL option so it gets a real id.
       if (!matched) {
-        throw new Error(
-          `Couldn't find the seeded option for ${kind} ${reference}.`
-        );
+        matched = await addRclPartOption(week.service_date, kind, reference);
       }
       await upsertWorshipPlan(week.service_date, {
         scripture_reference: reference,
@@ -121,6 +126,34 @@ export default function WeekCard({
         lectionary_designation: week.designation,
         liturgical_season: week.liturgical_season,
       });
+      await reload();
+    } catch (e) {
+      setError(e.message || String(e));
+    } finally {
+      setBusyDate(null);
+    }
+  };
+
+  // After options are seeded for voting, pastor can split a compound
+  // option into two separate vote-able options. This deletes the
+  // compound row and inserts two new ones (same kind, source='rcl').
+  // Any votes on the original compound are lost (cascade delete).
+  const handleSplit = async (option) => {
+    const parts = splitCompoundReading(option.reference);
+    if (parts.length < 2) return;
+    if (
+      !window.confirm(
+        `Split this option into ${parts.length} separate options?\n\n` +
+          parts.map((p, i) => `${i + 1}. ${p}`).join('\n') +
+          '\n\nAny existing votes on the combined option will be cleared.'
+      )
+    ) {
+      return;
+    }
+    setBusyDate(week.service_date);
+    setError(null);
+    try {
+      await splitOption(option);
       await reload();
     } catch (e) {
       setError(e.message || String(e));
@@ -319,29 +352,57 @@ export default function WeekCard({
         </p>
         {options.length === 0 ? (
           <ul className="space-y-1">
-            {Object.entries(week.readings || {}).map(([kind, ref]) => (
-              <li
-                key={kind}
-                className="flex items-center justify-between gap-2 py-1"
-              >
-                <div className="flex items-baseline gap-2 min-w-0">
-                  <span className="text-[10px] uppercase tracking-wide text-gray-500 w-12 shrink-0">
-                    {READING_LABELS[kind] || kind}
-                  </span>
-                  <span className="text-sm text-umc-900 truncate">{ref}</span>
-                </div>
-                {decide && status !== 'selected' && (
-                  <button
-                    type="button"
-                    onClick={() => pickRclDirect(kind, ref)}
-                    disabled={busy}
-                    className="text-xs text-umc-700 hover:text-umc-900 underline disabled:opacity-50 whitespace-nowrap"
-                  >
-                    Pick this
-                  </button>
-                )}
-              </li>
-            ))}
+            {Object.entries(week.readings || {}).map(([kind, ref]) => {
+              const parts = splitCompoundReading(ref);
+              const compound = parts.length > 1;
+              return (
+                <li key={kind} className="py-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-baseline gap-2 min-w-0">
+                      <span className="text-[10px] uppercase tracking-wide text-gray-500 w-12 shrink-0">
+                        {READING_LABELS[kind] || kind}
+                      </span>
+                      <span className="text-sm text-umc-900 truncate">{ref}</span>
+                    </div>
+                    {decide && status !== 'selected' && !compound && (
+                      <button
+                        type="button"
+                        onClick={() => pickRclDirect(kind, ref)}
+                        disabled={busy}
+                        className="text-xs text-umc-700 hover:text-umc-900 underline disabled:opacity-50 whitespace-nowrap"
+                      >
+                        Pick this
+                      </button>
+                    )}
+                  </div>
+                  {compound && decide && status !== 'selected' && (
+                    // Compound reading — let pastor pick one part instead of
+                    // committing to the whole "A or B" string.
+                    <ul className="mt-1 ml-14 space-y-0.5">
+                      {parts.map((p) => (
+                        <li
+                          key={p}
+                          className="flex items-center justify-between gap-2"
+                        >
+                          <span className="text-xs text-gray-700 truncate">
+                            ↳ {p}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => pickRclDirect(kind, p)}
+                            disabled={busy}
+                            className="text-xs text-umc-700 hover:text-umc-900 underline disabled:opacity-50 whitespace-nowrap"
+                            title={`Pick just "${p}" as the chosen text`}
+                          >
+                            Pick this
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         ) : (
           <ul className="space-y-1.5">
@@ -390,6 +451,17 @@ export default function WeekCard({
                       <span className="text-xs text-gray-500">
                         👍 {votes.length}
                       </span>
+                    )}
+                    {decide && status !== 'selected' && isCompoundReading(o.reference) && (
+                      <button
+                        type="button"
+                        onClick={() => handleSplit(o)}
+                        disabled={busy}
+                        className="text-xs text-amber-700 hover:text-amber-900 underline disabled:opacity-50 whitespace-nowrap"
+                        title="Split this 'A or B' option into two separate vote-able options"
+                      >
+                        Split
+                      </button>
                     )}
                     {decide && status !== 'selected' && (
                       <button
