@@ -10,9 +10,13 @@ import {
   splitOption,
   splitCompoundReading,
   isCompoundReading,
+  setUpcomingSermon,
+  setSermonFromScratch,
+  clearSermonPlan,
   READING_LABELS,
   deriveStatus,
 } from '../lib/planning';
+import { sermonArchiveUrl } from '../lib/intelligence';
 import IntelligencePanel from './IntelligencePanel.jsx';
 
 // Renders one Sunday (or RCL-listed special service) in the forecast.
@@ -45,6 +49,9 @@ export default function WeekCard({
   state,
   groupingState,
   weekElementsByDate,
+  // Map of sermon_id → small sermon projection, populated by Forecast
+  // for any worship_plans that have a selected_sermon_id.
+  sermonsById = {},
   userId,
   role,
   busyDate,
@@ -243,6 +250,44 @@ export default function WeekCard({
     }
   };
 
+  // Pastor-only sermon-plan handlers — write to worship_plans.
+  const handlePickSermon = async (sermonId) => {
+    setBusyDate(week.service_date);
+    setError(null);
+    try {
+      await setUpcomingSermon(week.service_date, sermonId);
+      await reload();
+    } catch (e) {
+      setError(e.message || String(e));
+    } finally {
+      setBusyDate(null);
+    }
+  };
+  const handleWriteFromScratch = async () => {
+    setBusyDate(week.service_date);
+    setError(null);
+    try {
+      await setSermonFromScratch(week.service_date);
+      await reload();
+    } catch (e) {
+      setError(e.message || String(e));
+    } finally {
+      setBusyDate(null);
+    }
+  };
+  const handleClearSermonPlan = async () => {
+    setBusyDate(week.service_date);
+    setError(null);
+    try {
+      await clearSermonPlan(week.service_date);
+      await reload();
+    } catch (e) {
+      setError(e.message || String(e));
+    } finally {
+      setBusyDate(null);
+    }
+  };
+
   return (
     <li className="card">
       <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -343,6 +388,20 @@ export default function WeekCard({
             )}
           </p>
         </div>
+      )}
+
+      {/* Upcoming sermon — pastor-only. Shows once a text is selected
+          and the pastor has indicated either a base sermon or that
+          they'll write from scratch. */}
+      {canSeePastorOnlyPanels(role) && status === 'selected' && (
+        <UpcomingSermonPin
+          plan={plan}
+          sermon={
+            plan?.selected_sermon_id ? sermonsById[plan.selected_sermon_id] : null
+          }
+          onClear={handleClearSermonPlan}
+          busy={busy}
+        />
       )}
 
       {/* RCL readings — always show as a reference */}
@@ -526,8 +585,89 @@ export default function WeekCard({
               : null)
           }
           themes={selectedThemes.map((s) => s.theme)}
+          textIsSelected={status === 'selected'}
+          selectedSermonId={plan?.selected_sermon_id || null}
+          fromScratch={Boolean(plan?.sermon_from_scratch)}
+          onPickSermon={handlePickSermon}
+          onPickFromScratch={handleWriteFromScratch}
+          onClearSermonPlan={handleClearSermonPlan}
         />
       )}
     </li>
+  );
+}
+
+// Pinned upcoming-sermon section — pastor-only. Shown when the text
+// is selected AND the pastor has indicated either a base sermon
+// (selected_sermon_id) or that they'll write from scratch.
+function UpcomingSermonPin({ plan, sermon, onClear, busy }) {
+  const hasSermon = Boolean(plan?.selected_sermon_id);
+  const fromScratch = Boolean(plan?.sermon_from_scratch);
+  if (!hasSermon && !fromScratch) return null;
+
+  if (fromScratch) {
+    return (
+      <div className="mt-3 p-3 rounded bg-purple-50 border border-purple-200 flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <p className="text-xs uppercase tracking-wide text-purple-800 mb-0.5">
+            Upcoming sermon
+          </p>
+          <p className="text-sm text-umc-900">
+            ✎ Writing from scratch
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClear}
+          disabled={busy}
+          className="text-xs text-gray-600 hover:text-gray-900 underline disabled:opacity-50"
+        >
+          Clear
+        </button>
+      </div>
+    );
+  }
+  // hasSermon
+  const archiveUrl = sermonArchiveUrl(plan.selected_sermon_id);
+  return (
+    <div className="mt-3 p-3 rounded bg-blue-50 border border-blue-200 flex items-start justify-between gap-3 flex-wrap">
+      <div className="min-w-0">
+        <p className="text-xs uppercase tracking-wide text-blue-800 mb-0.5">
+          Upcoming sermon — based on
+        </p>
+        <p className="text-sm text-umc-900">
+          {archiveUrl ? (
+            <a
+              href={archiveUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-umc-700 hover:text-umc-900 underline"
+            >
+              {sermon?.title || '(loading…)'}
+            </a>
+          ) : (
+            sermon?.title || '(loading…)'
+          )}
+          {sermon?.scripture_reference && (
+            <span className="ml-2 text-xs text-gray-500">
+              {sermon.scripture_reference}
+            </span>
+          )}
+          {sermon?.hasManuscript && (
+            <span className="ml-1 text-[10px]" title="Has manuscript on file">
+              📄
+            </span>
+          )}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={onClear}
+        disabled={busy}
+        className="text-xs text-gray-600 hover:text-gray-900 underline disabled:opacity-50"
+      >
+        Clear
+      </button>
+    </div>
   );
 }

@@ -21,11 +21,24 @@ import {
 // Each section defaults to verse-overlap matches only. A "+ N chapter,
 // + M book" expander reveals wider matches when the pastor wants them.
 // Sermons with a manuscript link out to the Sermon Archive.
-export default function IntelligencePanel({ scriptureReference, themes }) {
+export default function IntelligencePanel({
+  scriptureReference,
+  themes,
+  // Pastor-only sermon-plan props. When provided, renders "Use this"
+  // affordance per WFUMC sermon row + a "Write from scratch" link at
+  // bottom. Without these, the panel is read-only intelligence.
+  textIsSelected = false,
+  selectedSermonId = null,
+  fromScratch = false,
+  onPickSermon, // (sermonId) => Promise — sets selected_sermon_id
+  onPickFromScratch, // () => Promise — sets sermon_from_scratch=true
+  onClearSermonPlan, // () => Promise — clears both
+}) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
+  const [actionBusy, setActionBusy] = useState(false);
 
   useEffect(() => {
     if (!open || data || loading) return;
@@ -87,11 +100,27 @@ export default function IntelligencePanel({ scriptureReference, themes }) {
                 title="WFUMC sermons"
                 emptyHint="No prior WFUMC-bulletin sermons match this text."
                 results={data.wfumcSermons}
+                pickerEnabled={Boolean(textIsSelected && onPickSermon)}
+                selectedSermonId={selectedSermonId}
+                onPickSermon={async (id) => {
+                  setActionBusy(true);
+                  try { await onPickSermon(id); }
+                  finally { setActionBusy(false); }
+                }}
+                actionBusy={actionBusy}
               />
               <SermonSection
                 title="Other matching sermons"
                 emptyHint="No other sermons in the archive match this text."
                 results={data.otherSermons}
+                pickerEnabled={Boolean(textIsSelected && onPickSermon)}
+                selectedSermonId={selectedSermonId}
+                onPickSermon={async (id) => {
+                  setActionBusy(true);
+                  try { await onPickSermon(id); }
+                  finally { setActionBusy(false); }
+                }}
+                actionBusy={actionBusy}
               />
               <ResourceSection
                 title="Resources matching this text"
@@ -112,6 +141,51 @@ export default function IntelligencePanel({ scriptureReference, themes }) {
                 results={data.resourcesByTheme}
                 isThemeMatch
               />
+
+              {/* Upcoming-sermon decision controls (pastor only).
+                  Only meaningful once the text is selected. */}
+              {textIsSelected && onPickFromScratch && (
+                <div className="mt-2 pt-3 border-t border-gray-100 flex items-center justify-between gap-2 flex-wrap">
+                  <p className="text-[11px] text-gray-500">
+                    {selectedSermonId
+                      ? 'Using a base sermon from above.'
+                      : fromScratch
+                        ? 'Marked: writing this sermon from scratch.'
+                        : 'Pick a base sermon above, or commit to a fresh draft →'}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    {(selectedSermonId || fromScratch) && onClearSermonPlan && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setActionBusy(true);
+                          try { await onClearSermonPlan(); }
+                          finally { setActionBusy(false); }
+                        }}
+                        disabled={actionBusy}
+                        className="text-xs text-gray-600 hover:text-gray-900 underline disabled:opacity-50"
+                      >
+                        Clear sermon plan
+                      </button>
+                    )}
+                    {!fromScratch && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setActionBusy(true);
+                          try { await onPickFromScratch(); }
+                          finally { setActionBusy(false); }
+                        }}
+                        disabled={actionBusy}
+                        className="text-xs btn-secondary py-0.5 px-2 disabled:opacity-50"
+                        title="Mark this week as 'writing from scratch' so the workload summary counts it"
+                      >
+                        ✎ Write from scratch
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -176,7 +250,15 @@ function widerLabel(wider) {
 
 // ---------- sermon section ----------
 
-function SermonSection({ title, emptyHint, results }) {
+function SermonSection({
+  title,
+  emptyHint,
+  results,
+  pickerEnabled = false,
+  selectedSermonId = null,
+  onPickSermon,
+  actionBusy = false,
+}) {
   const { primary, wider } = useMemo(() => splitTiers(results), [results]);
   const [showWider, setShowWider] = useState(false);
   const visible = showWider ? [...primary, ...wider] : primary;
@@ -210,6 +292,10 @@ function SermonSection({ title, emptyHint, results }) {
                 sermon={sermon}
                 tier={tier}
                 wfumcDates={wfumcDates}
+                pickerEnabled={pickerEnabled}
+                isSelected={selectedSermonId === sermon.id}
+                onPickSermon={onPickSermon}
+                actionBusy={actionBusy}
               />
             ))}
             {visible.length > 12 && (
@@ -235,7 +321,15 @@ function SermonSection({ title, emptyHint, results }) {
   );
 }
 
-function SermonRow({ sermon, tier, wfumcDates }) {
+function SermonRow({
+  sermon,
+  tier,
+  wfumcDates,
+  pickerEnabled = false,
+  isSelected = false,
+  onPickSermon,
+  actionBusy = false,
+}) {
   // Always link the title to the Sermon Archive entry (even sermons
   // without a manuscript on file — the archive page lets the pastor
   // view + edit metadata, history, etc.). The 📄 indicator separately
@@ -243,7 +337,11 @@ function SermonRow({ sermon, tier, wfumcDates }) {
   const archiveUrl = sermonArchiveUrl(sermon.id);
   const titleNode = sermon.title || '(untitled)';
   return (
-    <li className="flex items-baseline gap-2 py-0.5">
+    <li
+      className={`flex items-baseline gap-2 py-0.5 px-1 rounded ${
+        isSelected ? 'bg-green-50' : ''
+      }`}
+    >
       <span
         className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded ${
           TIER_BADGE[tier] || ''
@@ -283,6 +381,28 @@ function SermonRow({ sermon, tier, wfumcDates }) {
         >
           · WFUMC {wfumcDates[0]}
           {wfumcDates.length > 1 && ` (+${wfumcDates.length - 1})`}
+        </span>
+      )}
+      {pickerEnabled && (
+        <span className="ml-auto shrink-0">
+          {isSelected ? (
+            <span
+              className="text-[10px] uppercase tracking-wide text-green-700"
+              title="Currently the upcoming sermon for this week"
+            >
+              ✓ Upcoming
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onPickSermon?.(sermon.id)}
+              disabled={actionBusy}
+              className="text-xs text-umc-700 hover:text-umc-900 underline disabled:opacity-50 whitespace-nowrap"
+              title="Set as the upcoming sermon for this week"
+            >
+              Use this
+            </button>
+          )}
         </span>
       )}
     </li>

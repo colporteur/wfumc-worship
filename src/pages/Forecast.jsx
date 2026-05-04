@@ -4,8 +4,18 @@ import WeekCard from '../components/WeekCard.jsx';
 import SpecialServiceCard from '../components/SpecialServiceCard.jsx';
 import AddSpecialServiceModal from '../components/AddSpecialServiceModal.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
-import { canDecide, canVote, ROLE_LABELS } from '../lib/permissions';
-import { upcomingSundays, loadPlanningState } from '../lib/planning';
+import {
+  canDecide,
+  canVote,
+  canSeePastorOnlyPanels,
+  ROLE_LABELS,
+} from '../lib/permissions';
+import {
+  upcomingSundays,
+  loadPlanningState,
+  loadSermonsByIds,
+  deriveSermonPlan,
+} from '../lib/planning';
 import { loadSpecialServicesFrom } from '../lib/specialServices';
 import { loadGroupingState } from '../lib/groupings';
 import { loadWeekElementsInRange } from '../lib/elements';
@@ -38,6 +48,7 @@ export default function Forecast() {
     myVotedThemes: new Set(),
   });
   const [weekElementsByDate, setWeekElementsByDate] = useState({});
+  const [sermonsById, setSermonsById] = useState({});
   const [showAddSpecial, setShowAddSpecial] = useState(false);
   const [editingSpecial, setEditingSpecial] = useState(null);
 
@@ -75,6 +86,22 @@ export default function Forecast() {
         elementsByDate[we.service_date].push(we);
       }
       setWeekElementsByDate(elementsByDate);
+
+      // Pull sermon details for any plans that picked one — populates
+      // the WeekCard's "Upcoming sermon" pinned section.
+      const sermonIds = Object.values(planning.plansByDate)
+        .map((p) => p?.selected_sermon_id)
+        .filter(Boolean);
+      if (sermonIds.length > 0) {
+        try {
+          const map = await loadSermonsByIds(sermonIds);
+          setSermonsById(map);
+        } catch {
+          setSermonsById({});
+        }
+      } else {
+        setSermonsById({});
+      }
     } catch (e) {
       setError(e.message || String(e));
     } finally {
@@ -147,6 +174,14 @@ export default function Forecast() {
         </div>
       )}
 
+      {/* Pastor-only workload summary across the visible Sundays */}
+      {canSeePastorOnlyPanels(profile.role) && sundays.length > 0 && (
+        <WorkloadSummary
+          sundays={sundays}
+          plansByDate={planningState.plansByDate}
+        />
+      )}
+
       {items.length === 0 ? (
         <p className="card text-center text-sm text-gray-500 py-10">
           No upcoming RCL data found. Add weeks to{' '}
@@ -162,6 +197,7 @@ export default function Forecast() {
                 state={planningState}
                 groupingState={groupingState}
                 weekElementsByDate={weekElementsByDate}
+                sermonsById={sermonsById}
                 userId={user.id}
                 role={profile.role}
                 busyDate={busyDate}
@@ -204,5 +240,70 @@ export default function Forecast() {
         onSaved={reload}
       />
     </div>
+  );
+}
+
+// Pastor-only workload summary across the visible Sundays. Counts how
+// many weeks already have a sermon decision (reuse vs from scratch)
+// versus still-undecided. Quick at-a-glance read of the writing
+// workload over the next 12 weeks.
+function WorkloadSummary({ sundays, plansByDate }) {
+  const counts = useMemo(() => {
+    const out = {
+      total: sundays.length,
+      reuse: 0,
+      from_scratch: 0,
+      undecided: 0,
+      no_text: 0,
+    };
+    for (const s of sundays) {
+      const plan = plansByDate[s.service_date];
+      const status = deriveSermonPlan(plan);
+      // "no_text" — the pastor hasn't even picked a scripture yet, so
+      // the sermon plan is moot. Counted separately so the workload
+      // numbers represent actually-actionable weeks.
+      const hasText = plan?.scripture_reference;
+      if (!hasText) {
+        out.no_text++;
+      } else if (status === 'reuse') {
+        out.reuse++;
+      } else if (status === 'from_scratch') {
+        out.from_scratch++;
+      } else {
+        out.undecided++;
+      }
+    }
+    return out;
+  }, [sundays, plansByDate]);
+
+  return (
+    <div className="card flex flex-wrap items-center gap-3">
+      <p className="text-xs uppercase tracking-wide text-gray-500">
+        Sermon workload · next {counts.total} weeks
+      </p>
+      <Pill label="Reusing a base" count={counts.reuse} cls="bg-blue-100 text-blue-800" />
+      <Pill
+        label="From scratch"
+        count={counts.from_scratch}
+        cls="bg-purple-100 text-purple-800"
+      />
+      <Pill
+        label="Text picked, no plan"
+        count={counts.undecided}
+        cls="bg-amber-100 text-amber-800"
+      />
+      <Pill label="Text not yet picked" count={counts.no_text} cls="bg-gray-100 text-gray-700" />
+    </div>
+  );
+}
+
+function Pill({ label, count, cls }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs ${cls}`}
+    >
+      <span className="font-semibold">{count}</span>
+      <span>{label}</span>
+    </span>
   );
 }

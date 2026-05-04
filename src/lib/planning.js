@@ -330,3 +330,76 @@ export async function splitOption(option) {
   );
   if (insErr) throw insErr;
 }
+
+// ---------- Upcoming-sermon decisions ----------
+//
+// After the text is selected, the pastor decides whether to reuse an
+// existing sermon (selected_sermon_id) or write from scratch
+// (sermon_from_scratch = true). The two are mutually exclusive — these
+// helpers always clear the other field when setting one.
+
+// Pick an existing sermon as the "upcoming sermon" for this date.
+// Clears the from-scratch flag.
+export async function setUpcomingSermon(serviceDate, sermonId) {
+  return upsertWorshipPlan(serviceDate, {
+    selected_sermon_id: sermonId,
+    sermon_from_scratch: false,
+  });
+}
+
+// Mark this date as "writing from scratch". Clears any existing sermon link.
+export async function setSermonFromScratch(serviceDate) {
+  return upsertWorshipPlan(serviceDate, {
+    selected_sermon_id: null,
+    sermon_from_scratch: true,
+  });
+}
+
+// Wipe the sermon decision — back to "undecided".
+export async function clearSermonPlan(serviceDate) {
+  return upsertWorshipPlan(serviceDate, {
+    selected_sermon_id: null,
+    sermon_from_scratch: false,
+  });
+}
+
+// Derive the sermon-prep status for a worship_plan row. Used by the
+// Forecast workload summary and WeekCard badges.
+//   'reuse'      — pastor picked an existing sermon to base from
+//   'from_scratch' — pastor committed to writing fresh
+//   'undecided'  — neither (default)
+export function deriveSermonPlan(plan) {
+  if (plan?.selected_sermon_id) return 'reuse';
+  if (plan?.sermon_from_scratch) return 'from_scratch';
+  return 'undecided';
+}
+
+// Lookup helper — pull a small projection of a sermon by id, used by
+// the WeekCard pinned section to show the picked sermon's title.
+// Returns null if the sermon isn't readable (RLS).
+export async function loadSermonsByIds(ids) {
+  if (!ids || ids.length === 0) return {};
+  const uniq = [...new Set(ids.filter(Boolean))];
+  if (uniq.length === 0) return {};
+  const { data, error } = await withTimeout(
+    supabase
+      .from('sermons')
+      .select('id, title, scripture_reference, theme, manuscript_text, manuscript_url')
+      .in('id', uniq)
+  );
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.warn('loadSermonsByIds:', error.message);
+    return {};
+  }
+  const out = {};
+  for (const s of data ?? []) {
+    out[s.id] = {
+      ...s,
+      hasManuscript: Boolean(s.manuscript_text || s.manuscript_url),
+      // Drop the actual text from the in-memory cache.
+      manuscript_text: undefined,
+    };
+  }
+  return out;
+}
