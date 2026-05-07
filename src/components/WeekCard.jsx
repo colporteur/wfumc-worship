@@ -1,5 +1,11 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext.jsx';
 import { canDecide, canVote, canSeePastorOnlyPanels } from '../lib/permissions';
+import {
+  syncWorshipPlanToBulletin,
+  bulletinExistsForDate,
+} from '../lib/bulletinSync';
 import {
   loadPlanningStateOnly,
   seedRclOptions,
@@ -387,6 +393,8 @@ export default function WeekCard({
               </span>
             )}
           </p>
+          {/* Pastor-only: push this plan to the matching bulletin. */}
+          {canSeePastorOnlyPanels(role) && <BulletinSyncButton plan={plan} />}
         </div>
       )}
 
@@ -668,6 +676,105 @@ function UpcomingSermonPin({ plan, sermon, onClear, busy }) {
       >
         Clear
       </button>
+    </div>
+  );
+}
+
+// One-click sync from a worship_plan to its corresponding bulletin.
+// Creates the bulletin if it doesn't exist yet. Surfaces success /
+// error inline so the pastor never has to leave the WeekCard. Only
+// shows when the plan has at least a scripture or theme to push.
+function BulletinSyncButton({ plan }) {
+  const { user } = useAuth();
+  const [exists, setExists] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null); // { ok, message }
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!plan?.service_date) return undefined;
+    bulletinExistsForDate(plan.service_date)
+      .then((v) => {
+        if (!cancelled) setExists(v);
+      })
+      .catch(() => {
+        if (!cancelled) setExists(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [plan?.service_date]);
+
+  const hasSomethingToSync =
+    plan &&
+    (plan.scripture_reference?.trim() ||
+      plan.theme?.trim() ||
+      plan.sermon_topic?.trim());
+
+  if (!hasSomethingToSync) return null;
+
+  const handleSync = async () => {
+    setBusy(true);
+    setResult(null);
+    try {
+      const out = await syncWorshipPlanToBulletin(plan, { userId: user?.id });
+      if (out.created && out.changes.length === 0) {
+        setResult({
+          ok: true,
+          message:
+            'Created the bulletin. Open the Bulletin app to add a scripture and sermon liturgy item, then sync again to push the data in.',
+        });
+      } else if (out.changes.length === 0) {
+        setResult({
+          ok: true,
+          message: 'Bulletin is already up to date with this plan.',
+        });
+      } else {
+        setResult({
+          ok: true,
+          message:
+            (out.created ? 'Created bulletin and synced: ' : 'Synced: ') +
+            out.changes.join('; '),
+        });
+      }
+      setExists(true);
+    } catch (e) {
+      setResult({ ok: false, message: e.message || String(e) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+      <button
+        type="button"
+        onClick={handleSync}
+        disabled={busy}
+        className="px-2 py-1 rounded bg-white border border-umc-200 text-umc-700 hover:bg-umc-50 disabled:opacity-50"
+        title={
+          exists
+            ? "Push this plan's scripture / theme / sermon-topic into the bulletin for this date."
+            : "Create the bulletin for this date and push this plan's scripture / theme / sermon-topic into it."
+        }
+      >
+        {busy
+          ? 'Syncing…'
+          : exists === false
+            ? '📋 Create + sync to bulletin'
+            : '📋 Sync to bulletin'}
+      </button>
+      {result && (
+        <span
+          className={
+            result.ok
+              ? 'text-green-700'
+              : 'text-red-700 bg-red-50 border border-red-200 rounded px-2 py-0.5'
+          }
+        >
+          {result.message}
+        </span>
+      )}
     </div>
   );
 }
