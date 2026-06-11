@@ -17,6 +17,7 @@ import {
   deriveSermonPlan,
 } from '../lib/planning';
 import { loadSpecialServicesFrom } from '../lib/specialServices';
+import { exportWorshipPlanningDocx } from '../lib/exportWorshipDoc';
 import { loadGroupingState } from '../lib/groupings';
 import { loadWeekElementsInRange } from '../lib/elements';
 
@@ -51,6 +52,7 @@ export default function Forecast() {
   const [sermonsById, setSermonsById] = useState({});
   const [showAddSpecial, setShowAddSpecial] = useState(false);
   const [editingSpecial, setEditingSpecial] = useState(null);
+  const [exporting, setExporting] = useState(null); // progress message | null
 
   const today = new Date().toISOString().slice(0, 10);
   const sundays = useMemo(() => upcomingSundays(today, 12), [today]);
@@ -155,16 +157,41 @@ export default function Forecast() {
           </p>
         </div>
         {decide && (
-          <button
-            type="button"
-            onClick={() => {
-              setEditingSpecial(null);
-              setShowAddSpecial(true);
-            }}
-            className="btn-secondary text-sm shrink-0"
-          >
-            + Add special service
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              disabled={Boolean(exporting)}
+              onClick={async () => {
+                setError(null);
+                setExporting('Starting export…');
+                try {
+                  await exportWorshipPlanningDocx({
+                    weeks: sundays,
+                    specials: specialServices,
+                    onProgress: (msg) => setExporting(msg),
+                  });
+                } catch (e) {
+                  setError(e.message || String(e));
+                } finally {
+                  setExporting(null);
+                }
+              }}
+              className="btn-secondary text-sm disabled:opacity-60"
+              title="Download a Word planning grid for the next 12 weeks"
+            >
+              {exporting ? exporting : '⬇ Word doc'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEditingSpecial(null);
+                setShowAddSpecial(true);
+              }}
+              className="btn-secondary text-sm"
+            >
+              + Add special service
+            </button>
+          </div>
         )}
       </div>
 
