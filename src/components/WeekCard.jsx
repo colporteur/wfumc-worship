@@ -24,6 +24,7 @@ import {
 } from '../lib/planning';
 import { sermonArchiveUrl } from '../lib/intelligence';
 import IntelligencePanel from './IntelligencePanel.jsx';
+import AdminItemsPanel from './AdminItemsPanel.jsx';
 
 // Renders one Sunday (or RCL-listed special service) in the forecast.
 // Extracted from Forecast.jsx so the page itself stays focused on
@@ -58,6 +59,7 @@ export default function WeekCard({
   // Map of sermon_id → small sermon projection, populated by Forecast
   // for any worship_plans that have a selected_sermon_id.
   sermonsById = {},
+  adminItemsByPlanId = new Map(),
   userId,
   role,
   busyDate,
@@ -577,6 +579,17 @@ export default function WeekCard({
             )}
           </ul>
         </div>
+      )}
+
+      {/* Admin items attached to this Sunday. Renders for anyone who
+          can see the plan (owner-scoped fetch on the parent — worship
+          team users' Maps will simply be empty). */}
+      {plan?.id && (
+        <AdminItemsPanel
+          items={adminItemsByPlanId.get(plan.id) || []}
+          onChanged={reload}
+          setError={setError}
+        />
       )}
 
       {/* Phase 3: pastor-only intelligence panel */}

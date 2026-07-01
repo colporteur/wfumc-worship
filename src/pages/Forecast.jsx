@@ -20,6 +20,7 @@ import { loadSpecialServicesFrom } from '../lib/specialServices';
 import { exportWorshipPlanningDocx } from '../lib/exportWorshipDoc';
 import { loadGroupingState } from '../lib/groupings';
 import { loadWeekElementsInRange } from '../lib/elements';
+import { loadItemsAttachedToPlans } from '../lib/adminItems';
 
 // Forecast — Phase 2.
 //
@@ -50,6 +51,7 @@ export default function Forecast() {
   });
   const [weekElementsByDate, setWeekElementsByDate] = useState({});
   const [sermonsById, setSermonsById] = useState({});
+  const [adminItemsByPlanId, setAdminItemsByPlanId] = useState(new Map());
   const [showAddSpecial, setShowAddSpecial] = useState(false);
   const [editingSpecial, setEditingSpecial] = useState(null);
   const [exporting, setExporting] = useState(null); // progress message | null
@@ -103,6 +105,22 @@ export default function Forecast() {
         }
       } else {
         setSermonsById({});
+      }
+
+      // Admin items attached to any of the visible worship_plans.
+      // Renders as the "📋 Admin items" panel on each WeekCard.
+      const planIds = Object.values(planning.plansByDate)
+        .map((p) => p?.id)
+        .filter(Boolean);
+      if (planIds.length > 0) {
+        try {
+          const map = await loadItemsAttachedToPlans(planIds);
+          setAdminItemsByPlanId(map);
+        } catch {
+          setAdminItemsByPlanId(new Map());
+        }
+      } else {
+        setAdminItemsByPlanId(new Map());
       }
     } catch (e) {
       setError(e.message || String(e));
@@ -225,6 +243,7 @@ export default function Forecast() {
                 groupingState={groupingState}
                 weekElementsByDate={weekElementsByDate}
                 sermonsById={sermonsById}
+                adminItemsByPlanId={adminItemsByPlanId}
                 userId={user.id}
                 role={profile.role}
                 busyDate={busyDate}

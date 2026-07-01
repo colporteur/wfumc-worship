@@ -6,6 +6,7 @@ import Forecast from './pages/Forecast.jsx';
 import Themes from './pages/Themes.jsx';
 import Library from './pages/Library.jsx';
 import Suggestions from './pages/Suggestions.jsx';
+import AdminItems from './pages/AdminItems.jsx';
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
         <Route path="/themes" element={<Themes />} />
         <Route path="/library" element={<Library />} />
         <Route path="/suggestions" element={<Suggestions />} />
+        <Route path="/admin-items" element={<AdminItems />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

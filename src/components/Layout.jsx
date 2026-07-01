@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { to: '/themes', label: 'Themes' },
   { to: '/library', label: 'Library' },
   { to: '/suggestions', label: 'Suggestions' },
+  { to: '/admin-items', label: 'Admin items' },
 ];
 
 export default function Layout() {
