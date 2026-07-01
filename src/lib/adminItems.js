@@ -271,6 +271,195 @@ export async function listUpcomingPlansForPicker({ horizonWeeks = 16 } = {}) {
   return data || [];
 }
 
+// ---------------------------------------------------------------------
+// Sunday-hint matcher — Phase 3
+// ---------------------------------------------------------------------
+
+// Common liturgical / seasonal aliases the hint might reference. Keys
+// are lowercased needles; values are keyword sets we look for on a
+// worship_plans row's theme/reference/service_date. Coarse-grained on
+// purpose — the goal is "highlight this Sunday because Claude thinks
+// this admin item belongs there," not perfect classification.
+const LITURGICAL_ALIASES = {
+  'palm sunday': ['palm'],
+  'good friday': ['good friday'],
+  'easter': ['easter', 'resurrection'],
+  'pentecost': ['pentecost'],
+  'ash wednesday': ['ash wednesday'],
+  'christ the king': ['christ the king', 'reign of christ'],
+  'all saints': ['all saints'],
+  'thanksgiving': ['thanksgiving'],
+  'reformation': ['reformation'],
+  'trinity': ['trinity'],
+  'transfiguration': ['transfiguration'],
+  'baptism of the lord': ['baptism of the lord', 'baptism of jesus'],
+  'christmas eve': ['christmas eve'],
+  'christmas': ['christmas'],
+  'advent': ['advent'],
+  'lent': ['lent'],
+  'epiphany': ['epiphany'],
+};
+
+const MONTHS = {
+  jan: 0, january: 0,
+  feb: 1, february: 1,
+  mar: 2, march: 2,
+  apr: 3, april: 3,
+  may: 4,
+  jun: 5, june: 5,
+  jul: 6, july: 6,
+  aug: 7, august: 7,
+  sep: 8, sept: 8, september: 8,
+  oct: 9, october: 9,
+  nov: 10, november: 10,
+  dec: 11, december: 11,
+};
+
+/**
+ * Given a free-text hint like "Palm Sunday" or "December 15" or
+ * "VBS closing (mid-July)", return the subset of plans that seem to
+ * match. Match kinds:
+ *   - liturgical: hint mentions Palm Sunday / Advent / Easter / etc.
+ *     → match plans whose theme matches that alias set
+ *   - date: hint mentions a Month + day (or year), or an ISO date
+ *     → match plans within ±7 days of that date
+ *   - keyword: hint mentions a distinctive word (VBS, potluck)
+ *     → match plans whose theme contains that word
+ *
+ * Returns { matchIds: Set<planId>, reason: string } so the picker can
+ * both filter and explain WHY those plans were highlighted. Empty Set
+ * when no hint or no matches; caller renders without special treatment.
+ */
+export function matchPlansToHint(hint, plans) {
+  const empty = { matchIds: new Set(), reason: '' };
+  const h = (hint || '').trim();
+  if (!h || !Array.isArray(plans) || plans.length === 0) return empty;
+  const lower = h.toLowerCase();
+  const matchIds = new Set();
+
+  // 1) Liturgical alias hits — themes are what worship_plans actually
+  //    hold at planning time.
+  for (const [needle, aliases] of Object.entries(LITURGICAL_ALIASES)) {
+    if (lower.includes(needle)) {
+      for (const p of plans) {
+        const theme = (p.theme || '').toLowerCase();
+        if (aliases.some((a) => theme.includes(a))) {
+          matchIds.add(p.id);
+        }
+      }
+    }
+  }
+
+  // 2) Date parse — try to pluck month+day (with optional year) or a
+  //    bare ISO date out of the hint.
+  const dateHits = extractDatesFromHint(h);
+  for (const target of dateHits) {
+    for (const p of plans) {
+      if (!p.service_date) continue;
+      if (daysBetween(p.service_date, target) <= 7) {
+        matchIds.add(p.id);
+      }
+    }
+  }
+
+  // 3) Keyword fallback — for hints that don't hit the alias list or
+  //    parse as a date. Take words 4+ chars long and look for them in
+  //    theme / scripture_reference. Skip generic stop-words.
+  if (matchIds.size === 0) {
+    const stop = new Set([
+      'sunday', 'church', 'service', 'worship', 'week', 'weekend',
+      'morning', 'evening', 'about', 'after', 'before', 'during',
+      'next', 'this', 'that', 'from', 'with',
+    ]);
+    const words = lower
+      .split(/[^a-z0-9]+/)
+      .filter((w) => w.length >= 4 && !stop.has(w));
+    for (const p of plans) {
+      const hay = `${p.theme || ''} ${p.scripture_reference || ''}`.toLowerCase();
+      if (words.some((w) => hay.includes(w))) {
+        matchIds.add(p.id);
+      }
+    }
+  }
+
+  if (matchIds.size === 0) return empty;
+  return {
+    matchIds,
+    reason:
+      matchIds.size === 1
+        ? '1 upcoming Sunday matches this hint'
+        : `${matchIds.size} upcoming Sundays match this hint`,
+  };
+}
+
+// Extract candidate ISO dates from a free-text hint. Handles:
+//   "December 15" (assumes nearest future occurrence)
+//   "Dec 15, 2026"
+//   "2026-07-14"
+//   "7/14" or "7/14/26" (US-style, month first)
+function extractDatesFromHint(hint) {
+  const out = [];
+  const now = new Date();
+
+  // ISO YYYY-MM-DD
+  for (const m of hint.matchAll(/\b(\d{4})-(\d{2})-(\d{2})\b/g)) {
+    out.push(`${m[1]}-${m[2]}-${m[3]}`);
+  }
+
+  // "Month D[,] [YYYY]" or "D Month [YYYY]"
+  const monthRe =
+    /\b(?:(jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december)\.?\s+(\d{1,2})|(\d{1,2})\s+(jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december))(?:\s*,?\s*(\d{4}))?\b/gi;
+  for (const m of hint.matchAll(monthRe)) {
+    const monthWord = (m[1] || m[4] || '').toLowerCase();
+    const day = parseInt(m[2] || m[3] || '', 10);
+    const yr = m[5] ? parseInt(m[5], 10) : null;
+    const month = MONTHS[monthWord];
+    if (month === undefined || !day) continue;
+    out.push(nearestFutureIso(month, day, yr, now));
+  }
+
+  // "M/D" or "M/D/YY"
+  for (const m of hint.matchAll(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/g)) {
+    const month = parseInt(m[1], 10) - 1;
+    const day = parseInt(m[2], 10);
+    let yr = null;
+    if (m[3]) {
+      yr = parseInt(m[3], 10);
+      if (yr < 100) yr += 2000;
+    }
+    if (month >= 0 && month <= 11 && day >= 1 && day <= 31) {
+      out.push(nearestFutureIso(month, day, yr, now));
+    }
+  }
+
+  return out;
+}
+
+function nearestFutureIso(month, day, yr, now) {
+  // If a year is provided, honor it. Otherwise pick this year if the
+  // date is in the future, else next year.
+  const year =
+    yr ??
+    (new Date(now.getFullYear(), month, day) >= startOfToday(now)
+      ? now.getFullYear()
+      : now.getFullYear() + 1);
+  const iso =
+    `${year.toString().padStart(4, '0')}-` +
+    `${(month + 1).toString().padStart(2, '0')}-` +
+    `${day.toString().padStart(2, '0')}`;
+  return iso;
+}
+
+function startOfToday(now) {
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+function daysBetween(isoA, isoB) {
+  const a = new Date(isoA + 'T00:00:00');
+  const b = new Date(isoB + 'T00:00:00');
+  return Math.abs(Math.round((a.getTime() - b.getTime()) / 86400000));
+}
+
 /**
  * Convenience: also fold in the plan_id → future-attachments count so
  * the picker can nudge the pastor "this Sunday already has 3 items."

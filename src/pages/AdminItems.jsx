@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+// (matchPlansToHint import above brings in the hint-matcher helper.)
 import { useAuth } from '../contexts/AuthContext.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
 import {
@@ -10,6 +11,7 @@ import {
   listAdminItems,
   listUpcomingPlansForPicker,
   loadAttachmentsForItems,
+  matchPlansToHint,
   setAdminItemStatus,
   updateAdminItem,
 } from '../lib/adminItems';
@@ -296,6 +298,17 @@ function AdminItemCard({ item, attachments, userId, onChanged, setError }) {
           <p className="text-[11px] text-gray-400 mt-0.5">
             added {fmtDateTime(item.created_at)}
           </p>
+          {item.suggested_sunday_hint && (
+            <p className="text-[11px] text-umc-700 mt-0.5">
+              📅 Suggested Sunday:{' '}
+              <span className="italic">{item.suggested_sunday_hint}</span>
+              {attachments.length === 0 && (
+                <span className="text-gray-400">
+                  {' '}— click <b>Attach to Sunday…</b> to see matching weeks
+                </span>
+              )}
+            </p>
+          )}
         </div>
       </div>
 
@@ -469,6 +482,7 @@ function AdminItemCard({ item, attachments, userId, onChanged, setError }) {
           userId={userId}
           adminItemId={item.id}
           alreadyAttachedPlanIds={new Set(attachments.map((a) => a.plan_id))}
+          suggestedHint={item.suggested_sunday_hint || null}
           onClose={() => setShowAttachPicker(false)}
           onAttached={() => {
             setShowAttachPicker(false);
@@ -502,6 +516,7 @@ function AttachToPlansModal({
   userId,
   adminItemId,
   alreadyAttachedPlanIds,
+  suggestedHint = null,
   onClose,
   onAttached,
 }) {
@@ -511,6 +526,15 @@ function AttachToPlansModal({
   const [countsByPlan, setCountsByPlan] = useState(new Map());
   const [picked, setPicked] = useState(new Set());
   const [saving, setSaving] = useState(false);
+
+  // Claude's hint match — computed after plans load. matchIds is a
+  // Set<planId>; empty when there's no hint or nothing matched. We
+  // highlight matches and offer a one-click "Select suggested" button;
+  // we never auto-attach (pastor-in-the-loop is deliberate).
+  const hintMatch = useMemo(
+    () => matchPlansToHint(suggestedHint, plans),
+    [suggestedHint, plans]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -589,22 +613,68 @@ function AttachToPlansModal({
           </p>
         ) : (
           <>
+            {suggestedHint && (
+              <div className="rounded border border-umc-200 bg-umc-50 p-2 text-xs">
+                <p className="text-umc-900">
+                  📅 Claude suggested this item might belong to{' '}
+                  <span className="italic">&ldquo;{suggestedHint}&rdquo;</span>.
+                </p>
+                {hintMatch.matchIds.size > 0 ? (
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px]">
+                    <span className="text-umc-700">{hintMatch.reason}.</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Only pre-fill checkboxes — pastor still has
+                        // to click "Attach" to commit. Skip any that
+                        // are already attached.
+                        setPicked((prev) => {
+                          const next = new Set(prev);
+                          for (const id of hintMatch.matchIds) {
+                            if (!alreadyAttachedPlanIds.has(id)) next.add(id);
+                          }
+                          return next;
+                        });
+                      }}
+                      className="text-umc-700 hover:text-umc-900 underline"
+                    >
+                      Select suggested Sunday{hintMatch.matchIds.size === 1 ? '' : 's'}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-gray-500 mt-1">
+                    No upcoming Sundays matched — pick manually below.
+                  </p>
+                )}
+              </div>
+            )}
             <p className="text-xs text-gray-500">
               Multi-select — this item will attach to each Sunday you pick.
               Sundays you&apos;ve already attached are grayed out.
+              {hintMatch.matchIds.size > 0 && ' Suggested matches are marked ✨.'}
             </p>
             <ul className="max-h-80 overflow-y-auto space-y-1 border border-gray-200 rounded p-2">
-              {plans.map((p) => {
+              {[...plans]
+                .sort((a, b) => {
+                  const aMatch = hintMatch.matchIds.has(a.id) ? 0 : 1;
+                  const bMatch = hintMatch.matchIds.has(b.id) ? 0 : 1;
+                  if (aMatch !== bMatch) return aMatch - bMatch;
+                  return (a.service_date || '').localeCompare(b.service_date || '');
+                })
+                .map((p) => {
                 const already = alreadyAttachedPlanIds.has(p.id);
                 const checked = picked.has(p.id);
                 const count = countsByPlan.get(p.id) || 0;
+                const matched = hintMatch.matchIds.has(p.id);
                 return (
                   <li key={p.id}>
                     <label
                       className={`flex items-start gap-2 p-1.5 rounded ${
                         already
                           ? 'opacity-50'
-                          : 'hover:bg-gray-50 cursor-pointer'
+                          : matched
+                            ? 'bg-umc-50 hover:bg-umc-100 cursor-pointer'
+                            : 'hover:bg-gray-50 cursor-pointer'
                       }`}
                     >
                       <input
@@ -616,6 +686,14 @@ function AttachToPlansModal({
                       />
                       <span className="flex-1 min-w-0">
                         <span className="text-sm text-umc-900">
+                          {matched && (
+                            <span
+                              className="mr-1"
+                              title="Matches Claude's suggested Sunday"
+                            >
+                              ✨
+                            </span>
+                          )}
                           {fmtDate(p.service_date)}
                         </span>
                         {p.theme && (
