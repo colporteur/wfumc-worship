@@ -23,6 +23,7 @@ import {
   deriveStatus,
 } from '../lib/planning';
 import { sermonArchiveUrl } from '../lib/intelligence';
+import { supabase, withTimeout } from '../lib/supabase';
 import IntelligencePanel from './IntelligencePanel.jsx';
 import AdminItemsPanel from './AdminItemsPanel.jsx';
 
@@ -397,6 +398,7 @@ export default function WeekCard({
           </p>
           {/* Pastor-only: push this plan to the matching bulletin. */}
           {canSeePastorOnlyPanels(role) && <BulletinSyncButton plan={plan} />}
+          {canSeePastorOnlyPanels(role) && <StartSermonButton plan={plan} />}
         </div>
       )}
 
@@ -689,6 +691,110 @@ function UpcomingSermonPin({ plan, sermon, onClear, busy }) {
       >
         Clear
       </button>
+    </div>
+  );
+}
+
+// Start a sermon in the Sermon Archive from this week's scripture.
+// Creates the sermons row here (shared Supabase project), then offers
+// a link straight into it — so the forecast can hand off to sermon
+// writing without retyping the reference.
+function StartSermonButton({ plan }) {
+  const { user } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null); // { ok, message, url }
+
+  const scripture = plan?.scripture_reference?.trim();
+  if (!scripture) return null;
+
+  const handleStart = async () => {
+    setBusy(true);
+    setResult(null);
+    try {
+      // Warn (don't block) if a sermon already exists on this exact
+      // reference — reusing an existing sermon is usually what the
+      // pastor wants, but sometimes a fresh take is the point.
+      const { data: existing } = await withTimeout(
+        supabase
+          .from('sermons')
+          .select('id, title')
+          .eq('owner_user_id', user.id)
+          .eq('scripture_reference', scripture)
+          .limit(1)
+      );
+      if (existing && existing.length > 0) {
+        const prior = existing[0];
+        if (
+          !window.confirm(
+            `You already have a sermon on ${scripture}` +
+              (prior.title ? ` ("${prior.title}")` : '') +
+              '.\n\nStart another one anyway?'
+          )
+        ) {
+          setBusy(false);
+          return;
+        }
+      }
+
+      const { data, error } = await withTimeout(
+        supabase
+          .from('sermons')
+          .insert({
+            owner_user_id: user.id,
+            title: plan.sermon_topic?.trim() || plan.theme?.trim() || null,
+            scripture_reference: scripture,
+            theme: plan.theme?.trim() || null,
+            preached_at: plan.service_date || null,
+          })
+          .select('id')
+          .single()
+      );
+      if (error) throw error;
+      const url = sermonArchiveUrl(data.id);
+      setResult({
+        ok: true,
+        message: url ? 'Sermon created.' : 'Sermon created in the Sermon Archive.',
+        url,
+      });
+    } catch (e) {
+      setResult({ ok: false, message: e.message || String(e) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+      <button
+        type="button"
+        onClick={handleStart}
+        disabled={busy}
+        className="px-2 py-1 rounded bg-white border border-umc-200 text-umc-700 hover:bg-umc-50 disabled:opacity-50"
+        title={`Create a new sermon in the Sermon Archive with ${scripture} as its scripture (plus this week's theme and date).`}
+      >
+        {busy ? 'Creating…' : '✍️ Start sermon from this Scripture'}
+      </button>
+      {result && (
+        <span
+          className={
+            result.ok
+              ? 'text-green-700'
+              : 'text-red-700 bg-red-50 border border-red-200 rounded px-2 py-0.5'
+          }
+        >
+          {result.message}{' '}
+          {result.ok && result.url && (
+            <a
+              className="underline"
+              href={result.url}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open it →
+            </a>
+          )}
+        </span>
+      )}
     </div>
   );
 }
