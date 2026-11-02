@@ -12,7 +12,9 @@
 //                       after the Epiphany"); specials use their label.
 //   * Text Description — Claude (low-cost model), ≤20 words.
 //   * Sermon Main Point — Claude (low-cost model), ≤30 words, only when
-//                       the week has a linked sermon; blank otherwise.
+//                       the week has a linked sermon; "No sermon" plus
+//                       the pastor's note when the week is marked
+//                       no-sermon; blank otherwise.
 //   * Music / Liturgy / Notes — always blank (filled in by hand).
 
 import {
@@ -135,6 +137,8 @@ function buildRows(weeks, specials, plansByDate) {
         textLines,
         liturgicalTime: w.designation || '',
         sermonId: plan?.selected_sermon_id || null,
+        noSermon: Boolean(plan?.no_sermon),
+        noSermonNote: plan?.no_sermon_note || '',
       };
     }
     // Special service. Non-Sundays show the weekday on its own line,
@@ -160,6 +164,8 @@ function buildRows(weeks, specials, plansByDate) {
       // (e.g. Easter Vigil on Easter morning's date) would just repeat
       // the Sunday row's sermon — leave it blank there.
       sermonId: wd === 'Sunday' ? null : plan?.selected_sermon_id || null,
+      noSermon: wd === 'Sunday' ? false : Boolean(plan?.no_sermon),
+      noSermonNote: wd === 'Sunday' ? '' : plan?.no_sermon_note || '',
     };
   });
 }
@@ -230,6 +236,16 @@ function bodyCell(lines, width) {
   });
 }
 
+// Sermon Main Point cell for a no-sermon week: bold "No sermon", then
+// the pastor's note (e.g. "Choir cantata") in italics on its own line.
+function noSermonCell(note, width) {
+  const children = [new Paragraph({ children: [run('No sermon', { bold: true })] })];
+  if (note) {
+    children.push(new Paragraph({ children: [run(note, { italics: true })] }));
+  }
+  return new TableCell({ width: { size: width, type: WidthType.DXA }, children });
+}
+
 function buildDoc(title, rows) {
   const headerRow = new TableRow({
     tableHeader: true,
@@ -244,7 +260,9 @@ function buildDoc(title, rows) {
           bodyCell(r.textLines, COL_WIDTHS[1]),
           bodyCell([r.liturgicalTime], COL_WIDTHS[2]),
           bodyCell(r.description ? [r.description] : [], COL_WIDTHS[3]),
-          bodyCell(r.mainPoint ? [r.mainPoint] : [], COL_WIDTHS[4]),
+          r.noSermon
+            ? noSermonCell(r.noSermonNote, COL_WIDTHS[4])
+            : bodyCell(r.mainPoint ? [r.mainPoint] : [], COL_WIDTHS[4]),
           bodyCell([], COL_WIDTHS[5]), // Music / Liturgy / Notes — by hand
         ],
       })

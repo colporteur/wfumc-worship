@@ -301,6 +301,7 @@ function WorkloadSummary({ sundays, plansByDate }) {
       from_scratch: 0,
       undecided: 0,
       no_text: 0,
+      no_sermon: 0,
     };
     for (const s of sundays) {
       const plan = plansByDate[s.service_date];
@@ -309,7 +310,10 @@ function WorkloadSummary({ sundays, plansByDate }) {
       // the sermon plan is moot. Counted separately so the workload
       // numbers represent actually-actionable weeks.
       const hasText = plan?.scripture_reference;
-      if (!hasText) {
+      if (status === 'no_sermon') {
+        // Not preaching (choir program, etc.) — not part of the workload.
+        out.no_sermon++;
+      } else if (!hasText) {
         out.no_text++;
       } else if (status === 'reuse') {
         out.reuse++;
@@ -339,6 +343,9 @@ function WorkloadSummary({ sundays, plansByDate }) {
         cls="bg-amber-100 text-amber-800"
       />
       <Pill label="Text not yet picked" count={counts.no_text} cls="bg-gray-100 text-gray-700" />
+      {counts.no_sermon > 0 && (
+        <Pill label="No sermon" count={counts.no_sermon} cls="bg-rose-100 text-rose-800" />
+      )}
     </div>
   );
 }

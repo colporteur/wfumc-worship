@@ -334,9 +334,18 @@ export async function splitOption(option) {
 // ---------- Upcoming-sermon decisions ----------
 //
 // After the text is selected, the pastor decides whether to reuse an
-// existing sermon (selected_sermon_id) or write from scratch
-// (sermon_from_scratch = true). The two are mutually exclusive — these
-// helpers always clear the other field when setting one.
+// existing sermon (selected_sermon_id), write from scratch
+// (sermon_from_scratch = true), or not preach at all that week
+// (no_sermon = true, with an optional no_sermon_note such as
+// "Choir cantata"). All three are mutually exclusive — these helpers
+// always clear the others when setting one.
+//
+// Requires worship_plans.no_sermon (boolean) + no_sermon_note (text):
+//   alter table worship_plans
+//     add column if not exists no_sermon boolean not null default false,
+//     add column if not exists no_sermon_note text;
+
+const CLEAR_NO_SERMON = { no_sermon: false, no_sermon_note: null };
 
 // Pick an existing sermon as the "upcoming sermon" for this date.
 // Clears the from-scratch flag.
@@ -344,6 +353,7 @@ export async function setUpcomingSermon(serviceDate, sermonId) {
   return upsertWorshipPlan(serviceDate, {
     selected_sermon_id: sermonId,
     sermon_from_scratch: false,
+    ...CLEAR_NO_SERMON,
   });
 }
 
@@ -352,6 +362,7 @@ export async function setSermonFromScratch(serviceDate) {
   return upsertWorshipPlan(serviceDate, {
     selected_sermon_id: null,
     sermon_from_scratch: true,
+    ...CLEAR_NO_SERMON,
   });
 }
 
@@ -360,15 +371,30 @@ export async function clearSermonPlan(serviceDate) {
   return upsertWorshipPlan(serviceDate, {
     selected_sermon_id: null,
     sermon_from_scratch: false,
+    ...CLEAR_NO_SERMON,
+  });
+}
+
+// Mark this date as "no sermon" (e.g. a choir cantata Sunday). Clears
+// any sermon link / from-scratch flag. `note` is optional free text.
+// Also used to edit the note on a week that's already marked.
+export async function setNoSermon(serviceDate, note) {
+  return upsertWorshipPlan(serviceDate, {
+    selected_sermon_id: null,
+    sermon_from_scratch: false,
+    no_sermon: true,
+    no_sermon_note: note?.trim() || null,
   });
 }
 
 // Derive the sermon-prep status for a worship_plan row. Used by the
 // Forecast workload summary and WeekCard badges.
+//   'no_sermon'  — no sermon this week (choir program, etc.)
 //   'reuse'      — pastor picked an existing sermon to base from
 //   'from_scratch' — pastor committed to writing fresh
-//   'undecided'  — neither (default)
+//   'undecided'  — none of the above (default)
 export function deriveSermonPlan(plan) {
+  if (plan?.no_sermon) return 'no_sermon';
   if (plan?.selected_sermon_id) return 'reuse';
   if (plan?.sermon_from_scratch) return 'from_scratch';
   return 'undecided';

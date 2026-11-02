@@ -19,6 +19,7 @@ import {
   setUpcomingSermon,
   setSermonFromScratch,
   clearSermonPlan,
+  setNoSermon,
   READING_LABELS,
   deriveStatus,
 } from '../lib/planning';
@@ -284,6 +285,18 @@ export default function WeekCard({
       setBusyDate(null);
     }
   };
+  const handleNoSermon = async (note) => {
+    setBusyDate(week.service_date);
+    setError(null);
+    try {
+      await setNoSermon(week.service_date, note);
+      await reload();
+    } catch (e) {
+      setError(e.message || String(e));
+    } finally {
+      setBusyDate(null);
+    }
+  };
   const handleClearSermonPlan = async () => {
     setBusyDate(week.service_date);
     setError(null);
@@ -405,7 +418,7 @@ export default function WeekCard({
       {/* Upcoming sermon — pastor-only. Shows once a text is selected
           and the pastor has indicated either a base sermon or that
           they'll write from scratch. */}
-      {canSeePastorOnlyPanels(role) && status === 'selected' && (
+      {canSeePastorOnlyPanels(role) && status === 'selected' && !plan?.no_sermon && (
         <UpcomingSermonPin
           plan={plan}
           sermon={
@@ -415,6 +428,17 @@ export default function WeekCard({
           busy={busy}
         />
       )}
+
+      {/* No sermon this week (choir cantata, etc.). The banner is shown
+          to everyone so the worship team sees it; only the pastor can
+          set, edit, or clear it. Works whether or not a text is picked. */}
+      <NoSermonControl
+        plan={plan}
+        canEdit={canSeePastorOnlyPanels(role)}
+        onSave={handleNoSermon}
+        onClear={handleClearSermonPlan}
+        busy={busy}
+      />
 
       {/* RCL readings — always show as a reference */}
       <div className="mt-3 space-y-1.5">
@@ -617,6 +641,121 @@ export default function WeekCard({
         />
       )}
     </li>
+  );
+}
+
+// "No sermon this week" — banner + note when set; a small link to set
+// it when the week has no sermon decision yet (pastor only).
+function NoSermonControl({ plan, canEdit, onSave, onClear, busy }) {
+  const isSet = Boolean(plan?.no_sermon);
+  const [editing, setEditing] = useState(false);
+  const [note, setNote] = useState(plan?.no_sermon_note || '');
+
+  useEffect(() => {
+    setNote(plan?.no_sermon_note || '');
+  }, [plan?.no_sermon_note]);
+
+  const save = async () => {
+    await onSave(note);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <div className="mt-3 p-3 rounded bg-rose-50 border border-rose-200 space-y-2">
+        <p className="text-xs uppercase tracking-wide text-rose-800">
+          No sermon this week
+        </p>
+        <input
+          type="text"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') save();
+            if (e.key === 'Escape') setEditing(false);
+          }}
+          placeholder="Note (optional) — e.g. Choir Advent cantata"
+          className="w-full text-sm border border-gray-300 rounded px-2 py-1"
+          autoFocus
+        />
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setNote(plan?.no_sermon_note || '');
+              setEditing(false);
+            }}
+            disabled={busy}
+            className="btn-secondary text-xs"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={save}
+            disabled={busy}
+            className="btn-primary text-xs disabled:opacity-50"
+          >
+            {busy ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isSet) {
+    return (
+      <div className="mt-3 p-3 rounded bg-rose-50 border border-rose-200 flex items-start justify-between gap-3 flex-wrap">
+        <div className="min-w-0">
+          <p className="text-xs uppercase tracking-wide text-rose-800 mb-0.5">
+            No sermon this week
+          </p>
+          {plan.no_sermon_note && (
+            <p className="text-sm text-umc-900 whitespace-pre-wrap">
+              {plan.no_sermon_note}
+            </p>
+          )}
+        </div>
+        {canEdit && (
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              disabled={busy}
+              className="text-xs text-gray-600 hover:text-gray-900 underline disabled:opacity-50"
+            >
+              {plan.no_sermon_note ? 'Edit note' : 'Add note'}
+            </button>
+            <button
+              type="button"
+              onClick={onClear}
+              disabled={busy}
+              className="text-xs text-gray-600 hover:text-gray-900 underline disabled:opacity-50"
+            >
+              Clear
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Not set — offer it only when there's no other sermon decision.
+  if (!canEdit || plan?.selected_sermon_id || plan?.sermon_from_scratch) {
+    return null;
+  }
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        disabled={busy}
+        className="text-xs text-rose-700 hover:text-rose-900 underline disabled:opacity-50"
+        title="Mark this week as having no sermon (choir program, etc.)"
+      >
+        🎵 No sermon this week
+      </button>
+    </div>
   );
 }
 
